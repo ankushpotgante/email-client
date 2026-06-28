@@ -1,5 +1,6 @@
 import uuid
 import time
+import datetime
 import imaplib
 import smtplib
 import email
@@ -475,7 +476,18 @@ def sync_emails(account_id: str, user_id: str = Depends(get_current_user)):
             if not body_html:
                 body_html = body.replace("\n", "<br>")
                 
-            iso_date = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            msg_date = parse_email_date(msg)
+            
+            # Check read/unread status from IMAP flags
+            is_read = False
+            try:
+                status_flags, flag_data = imap.fetch(msg_id, "(FLAGS)")
+                if status_flags == "OK" and flag_data and flag_data[0]:
+                    flags_str = flag_data[0].decode("utf-8", errors="ignore")
+                    if "\\Seen" in flags_str:
+                        is_read = True
+            except Exception as fe:
+                logger.warning(f"Error fetching flags for msg {msg_id}: {fe}")
             
             db.add_email(
                 email_id=local_id,
@@ -487,10 +499,10 @@ def sync_emails(account_id: str, user_id: str = Depends(get_current_user)):
                 subject=subject,
                 body=body,
                 body_html=body_html,
-                date_str=iso_date,
+                date_str=msg_date,
                 folder="inbox",
                 labels=["Inbox"],
-                read=False,
+                read=is_read,
                 priority="medium",
                 priority_reason="",
                 summary=""
@@ -532,6 +544,7 @@ def sync_emails(account_id: str, user_id: str = Depends(get_current_user)):
                                 sbody = "(No readable content)"
                             if not sbody_html:
                                 sbody_html = sbody.replace("\n", "<br>")
+                            smsg_date = parse_email_date(smsg)
                             db.add_email(
                                 email_id=slid,
                                 account_id=account_id,
@@ -542,7 +555,7 @@ def sync_emails(account_id: str, user_id: str = Depends(get_current_user)):
                                 subject=ssubject,
                                 body=sbody,
                                 body_html=sbody_html,
-                                date_str=iso_date,
+                                date_str=smsg_date,
                                 folder="sent",
                                 labels=["Sent"],
                                 read=True,
@@ -685,3 +698,21 @@ def get_email_body_content(msg) -> tuple:
         body_text = re.sub(clean, '', body_html)
         
     return body_text, body_html
+
+def parse_email_date(msg) -> str:
+    """
+    Parses the 'Date' header from an email message and returns a standardized 
+    ISO 8601 UTC timestamp (YYYY-MM-DDTHH:MM:SSZ). Falls back to the current time 
+    if the header is missing or invalid.
+    """
+    date_header = msg.get("Date")
+    if date_header:
+        try:
+            dt = email.utils.parsedate_to_datetime(date_header)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=datetime.timezone.utc)
+            return dt.astimezone(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        except Exception as e:
+            logger.warning(f"Failed to parse email Date header '{date_header}': {e}")
+    # Fallback to current time
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())

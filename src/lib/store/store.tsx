@@ -65,6 +65,7 @@ interface EmailContextType {
   moveToFolder: (emailIds: string[], folder: string) => Promise<void>;
   toggleReadStatus: (emailIds: string[], read: boolean) => Promise<void>;
   sendEmail: (accountId: string, toEmail: string, subject: string, body: string) => Promise<boolean>;
+  forwardEmail: (emailId: string, toEmail: string, note: string) => Promise<boolean>;
   getAISummary: (emailId: string) => Promise<string>;
   triggerAITriage: (emailId: string) => Promise<void>;
   generateAIDraft: (emailId: string, prompt: string, tone: string) => Promise<string>;
@@ -337,6 +338,28 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  // Forward email
+  const forwardEmail = async (emailId: string, toEmail: string, note: string) => {
+    if (!token) return false;
+    try {
+      const res = await fetch(`${API_BASE}/emails/forward`, {
+        method: "POST",
+        headers: getRequestHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ emailId, toEmail, note })
+      });
+      if (res.ok) {
+        if (activeFolder === "sent") {
+          fetchEmails();
+        }
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.error("Failed to forward email:", e);
+      return false;
+    }
+  };
+
   // Fetch AI Summary of an email thread
   const getAISummary = async (emailId: string): Promise<string> => {
     if (!token) return "";
@@ -492,6 +515,7 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         moveToFolder,
         toggleReadStatus,
         sendEmail,
+        forwardEmail,
         getAISummary,
         triggerAITriage,
         generateAIDraft,

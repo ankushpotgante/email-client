@@ -37,7 +37,8 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
     moveToFolder,
     toggleReadStatus,
     setIsComposeOpen,
-    token
+    token,
+    forwardEmail
   } = useEmailStore();
 
   const [aiSummary, setAiSummary] = useState<string>("");
@@ -52,6 +53,16 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
   const [isForwarding, setIsForwarding] = useState(false);
   const [smartSuggestions, setSmartSuggestions] = useState<Array<{label: string; prompt: string}> | null>(null);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const forwardInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Auto-focus on Forward input when composer is toggled open
+  useEffect(() => {
+    if (isForwardOpen) {
+      setTimeout(() => {
+        forwardInputRef.current?.focus();
+      }, 50);
+    }
+  }, [isForwardOpen]);
 
   // Find the currently selected email
   const email = emails.find((e) => e.id === activeEmailId);
@@ -149,22 +160,16 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
     if (!forwardTo || !email) return;
     setIsForwarding(true);
     try {
-      const res = await fetch("/api/emails/forward", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          emailId: email.id,
-          toEmail: forwardTo,
-          note: forwardNote
-        })
-      });
-      if (res.ok) {
+      const success = await forwardEmail(email.id, forwardTo, forwardNote);
+      if (success) {
         setIsForwardOpen(false);
         setForwardTo("");
         setForwardNote("");
+        canvasConfetti({
+          particleCount: 80,
+          spread: 60,
+          origin: { y: 0.8 }
+        });
       }
     } catch (e) {
       console.error("Failed to forward email:", e);
@@ -232,17 +237,6 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
                 <span>Mark Read</span>
               </>
             )}
-          </button>
-          <button
-            onClick={() => setIsForwardOpen(!isForwardOpen)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${
-              isForwardOpen
-                ? "bg-teal-500/10 border-teal-500/30 text-teal-400"
-                : "bg-zinc-900/40 border-zinc-800/80 text-zinc-400 hover:text-teal-400 hover:bg-zinc-900 hover:border-zinc-800"
-            }`}
-          >
-            <Forward className="w-3.5 h-3.5" />
-            <span>Forward</span>
           </button>
         </div>
 
@@ -326,151 +320,202 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
           </div>
         )}
 
-        {/* Forward Panel */}
-        {isForwardOpen && (
-          <div className="bg-teal-500/5 border border-teal-500/20 rounded-2xl p-4 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Forward className="w-4 h-4 text-teal-400" />
-                <h4 className="text-xs font-bold text-teal-400">Forward Email</h4>
+        {activeTab === "read" && (
+          <>
+            {email.bodyHtml ? (
+              <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm overflow-x-hidden w-full text-zinc-900">
+                <iframe
+                  title="Email HTML Body"
+                  srcDoc={`
+                    <!DOCTYPE html>
+                    <html>
+                      <head>
+                        <meta charset="utf-8">
+                        <meta name="viewport" content="width=device-width, initial-scale=1">
+                        <style>
+                          * { box-sizing: border-box; }
+                          html, body {
+                            margin: 0;
+                            padding: 0;
+                            width: 100%;
+                            background-color: #ffffff;
+                          }
+                          body {
+                            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                            font-size: 14px;
+                            line-height: 1.65;
+                            color: #222222;
+                            word-wrap: break-word;
+                            overflow-wrap: break-word;
+                            background-color: #ffffff;
+                            padding: 4px 2px;
+                          }
+                          a { color: #1a0dab; text-decoration: none; font-weight: 500; }
+                          a:hover { text-decoration: underline; }
+                          img { max-width: 100% !important; height: auto; border-radius: 4px; margin: 8px 0; display: inline-block; }
+                          p { margin: 0 0 1em 0; }
+                          p:last-child { margin-bottom: 0; }
+                          blockquote {
+                            border-left: 3px solid #e5e7eb;
+                            margin: 1em 0;
+                            padding-left: 1em;
+                            color: #555555;
+                          }
+                          ul, ol { margin: 0 0 1em 0; padding-left: 1.5em; }
+                          table { max-width: 100% !important; border-collapse: collapse; }
+                          td, th { padding: 6px; }
+                          pre, code {
+                            background-color: #f4f4f5;
+                            border: 1px solid #e4e4e7;
+                            border-radius: 6px;
+                            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+                            font-size: 12px;
+                            color: #1f2937;
+                          }
+                          pre { padding: 12px; overflow-x: auto; }
+                          code { padding: 2px 4px; }
+                          h1,h2,h3,h4 { color: #111827; margin: 0 0 0.75em 0; }
+                          hr { border: 0; border-top: 1px solid #e5e7eb; margin: 1.5em 0; }
+                          div[style] { max-width: 100% !important; }
+                        </style>
+                      </head>
+                      <body>${email.bodyHtml}</body>
+                    </html>
+                  `}
+                  sandbox="allow-popups allow-popups-to-escape-sandbox"
+                  className="w-full border-0 bg-white block min-h-[420px]"
+                  onLoad={(e) => {
+                    try {
+                      const iframe = e.currentTarget;
+                      const resize = () => {
+                        const body = iframe.contentDocument?.body;
+                        const html = iframe.contentDocument?.documentElement;
+                        if (body && html) {
+                          const height = Math.max(
+                            body.scrollHeight,
+                            body.offsetHeight,
+                            html.clientHeight,
+                            html.scrollHeight,
+                            html.offsetHeight
+                          );
+                          iframe.style.height = `${height + 24}px`;
+                        }
+                      };
+                      resize();
+                      // Try again after images load
+                      setTimeout(resize, 400);
+                      setTimeout(resize, 1000);
+                    } catch (err) {
+                      console.error("Iframe resize error:", err);
+                    }
+                  }}
+                />
               </div>
-              <button onClick={() => setIsForwardOpen(false)} className="text-zinc-500 hover:text-zinc-300 cursor-pointer">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <div className="space-y-2">
-              <input
-                type="email"
-                value={forwardTo}
-                onChange={(e) => setForwardTo(e.target.value)}
-                placeholder="Forward to email address..."
-                className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-teal-500/50"
-              />
-              <textarea
-                value={forwardNote}
-                onChange={(e) => setForwardNote(e.target.value)}
-                placeholder="Add a note (optional)..."
-                rows={2}
-                className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-teal-500/50 resize-none"
-              />
-            </div>
-            <div className="flex justify-end gap-2">
+            ) : (
+              <div className="bg-zinc-900/20 border border-zinc-900/60 rounded-2xl p-6 shadow-sm overflow-x-hidden w-full">
+                <div className="prose prose-invert max-w-none text-sm text-zinc-300 whitespace-pre-wrap break-words leading-relaxed w-full overflow-x-hidden">
+                  {email.body}
+                </div>
+              </div>
+            )}
+
+            {/* Gmail-style quick action buttons at the bottom */}
+            <div className="flex gap-3 pt-6 border-t border-zinc-800/60 mt-8">
               <button
-                onClick={() => setIsForwardOpen(false)}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+                onClick={handleOpenReplyTab}
+                className="flex items-center gap-2 px-5 py-2 border border-zinc-800/80 hover:bg-zinc-850 hover:text-zinc-200 text-zinc-400 hover:border-zinc-700 rounded-full text-xs font-semibold transition-all cursor-pointer"
               >
-                Cancel
+                <CornerUpLeft className="w-4 h-4 text-zinc-500" />
+                <span>Reply</span>
               </button>
               <button
-                onClick={handleForward}
-                disabled={!forwardTo || isForwarding}
-                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-teal-500 hover:bg-teal-600 disabled:bg-zinc-800 disabled:text-zinc-600 text-white text-xs font-bold transition-colors cursor-pointer"
+                onClick={() => setIsForwardOpen(true)}
+                className="flex items-center gap-2 px-5 py-2 border border-zinc-800/80 hover:bg-zinc-850 hover:text-zinc-200 text-zinc-400 hover:border-zinc-700 rounded-full text-xs font-semibold transition-all cursor-pointer"
               >
-                {isForwarding ? (
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Forward className="w-3.5 h-3.5" />
-                )}
+                <Forward className="w-4 h-4 text-zinc-500" />
                 <span>Forward</span>
               </button>
             </div>
-          </div>
-        )}
 
-        {activeTab === "read" && (
-          <div className="bg-zinc-900/20 border border-zinc-900/60 rounded-2xl p-6 shadow-sm overflow-x-hidden w-full">
-            {email.bodyHtml ? (
-              <iframe
-                title="Email HTML Body"
-                srcDoc={`
-                  <!DOCTYPE html>
-                  <html>
-                    <head>
-                      <meta charset="utf-8">
-                      <meta name="viewport" content="width=device-width, initial-scale=1">
-                      <style>
-                        * { box-sizing: border-box; }
-                        html, body {
-                          margin: 0;
-                          padding: 0;
-                          width: 100%;
-                        }
-                        body {
-                          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                          font-size: 14px;
-                          line-height: 1.65;
-                          color: #d4d4d8;
-                          word-wrap: break-word;
-                          overflow-wrap: break-word;
-                          background-color: transparent;
-                          padding: 4px 2px;
-                        }
-                        a { color: #818cf8; text-decoration: none; font-weight: 500; }
-                        a:hover { text-decoration: underline; }
-                        img { max-width: 100% !important; height: auto; border-radius: 8px; margin: 8px 0; display: block; }
-                        p { margin: 0 0 1em 0; }
-                        p:last-child { margin-bottom: 0; }
-                        blockquote {
-                          border-left: 3px solid #3f3f46;
-                          margin: 1em 0;
-                          padding-left: 1em;
-                          color: #a1a1aa;
-                        }
-                        ul, ol { margin: 0 0 1em 0; padding-left: 1.5em; }
-                        table { max-width: 100% !important; width: 100% !important; border-collapse: collapse; }
-                        td, th { padding: 6px; }
-                        pre, code {
-                          background-color: #18181b;
-                          border: 1px solid #27272a;
-                          border-radius: 6px;
-                          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-                          font-size: 12px;
-                        }
-                        pre { padding: 12px; overflow-x: auto; }
-                        code { padding: 2px 4px; }
-                        h1,h2,h3,h4 { color: #f4f4f5; margin: 0 0 0.75em 0; }
-                        hr { border: 0; border-top: 1px solid #3f3f46; margin: 1.5em 0; }
-                        div[style] { max-width: 100% !important; }
-                      </style>
-                    </head>
-                    <body>${email.bodyHtml}</body>
-                  </html>
-                `}
-                sandbox="allow-popups allow-popups-to-escape-sandbox"
-                className="w-full border-0 bg-transparent block min-h-[420px]"
-                style={{ colorScheme: "dark" }}
-                onLoad={(e) => {
-                  try {
-                    const iframe = e.currentTarget;
-                    const resize = () => {
-                      const body = iframe.contentDocument?.body;
-                      const html = iframe.contentDocument?.documentElement;
-                      if (body && html) {
-                        const height = Math.max(
-                          body.scrollHeight,
-                          body.offsetHeight,
-                          html.clientHeight,
-                          html.scrollHeight,
-                          html.offsetHeight
-                        );
-                        iframe.style.height = `${height + 24}px`;
-                      }
-                    };
-                    resize();
-                    // Try again after images load
-                    setTimeout(resize, 400);
-                    setTimeout(resize, 1000);
-                  } catch (err) {
-                    console.error("Iframe resize error:", err);
-                  }
-                }}
-              />
-            ) : (
-              <div className="prose prose-invert max-w-none text-sm text-zinc-300 whitespace-pre-wrap break-words leading-relaxed w-full overflow-x-hidden">
-                {email.body}
+            {/* Inline Gmail-style Forward Composer */}
+            {isForwardOpen && (
+              <div className="border border-teal-500/20 bg-teal-500/2 rounded-2xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-200 mt-6">
+                <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                  <div className="flex items-center gap-2 text-teal-400">
+                    <Forward className="w-4 h-4" />
+                    <span className="text-xs font-bold uppercase tracking-wider">Forwarding Message</span>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setIsForwardOpen(false);
+                      setForwardTo("");
+                      setForwardNote("");
+                    }} 
+                    className="text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                
+                <div className="space-y-3">
+                  {/* Recipient block */}
+                  <div className="flex items-center gap-3 bg-zinc-950/40 px-4 py-3 rounded-xl border border-zinc-850 focus-within:border-teal-500/30 transition-all">
+                    <span className="text-xs text-zinc-500 font-bold shrink-0">To:</span>
+                    <input
+                      ref={forwardInputRef}
+                      type="email"
+                      value={forwardTo}
+                      onChange={(e) => setForwardTo(e.target.value)}
+                      placeholder="recipient@domain.com"
+                      className="w-full bg-transparent text-xs text-zinc-200 placeholder-zinc-650 focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Body/Note input */}
+                  <div className="bg-zinc-950/40 p-4 rounded-xl border border-zinc-850 focus-within:border-teal-500/30 transition-all">
+                    <textarea
+                      value={forwardNote}
+                      onChange={(e) => setForwardNote(e.target.value)}
+                      placeholder="Add a comment or note above the forwarded message..."
+                      rows={5}
+                      className="w-full bg-transparent text-xs text-zinc-200 placeholder-zinc-650 focus:outline-none resize-none leading-relaxed"
+                    />
+                  </div>
+                </div>
+
+                {/* Actions row */}
+                <div className="flex items-center justify-between pt-1">
+                  <div className="text-[10px] text-zinc-500 font-medium">
+                    The original email content will be appended below.
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setIsForwardOpen(false);
+                        setForwardTo("");
+                        setForwardNote("");
+                      }}
+                      className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850 rounded-xl transition-all cursor-pointer"
+                    >
+                      Discard
+                    </button>
+                    <button
+                      onClick={handleForward}
+                      disabled={!forwardTo || isForwarding}
+                      className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-teal-500 hover:bg-teal-600 disabled:bg-zinc-850 disabled:text-zinc-600 text-white text-xs font-bold shadow-md shadow-teal-500/10 transition-all cursor-pointer"
+                    >
+                      {isForwarding ? (
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Send className="w-3.5 h-3.5" />
+                      )}
+                      <span>Send</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
-          </div>
+          </>
         )}
 
         {activeTab === "summary" && (
