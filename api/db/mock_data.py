@@ -1,5 +1,5 @@
 import time
-from typing import List, Dict
+from typing import List, Dict, Optional
 from api.models import Email, Account
 
 # Mock accounts list

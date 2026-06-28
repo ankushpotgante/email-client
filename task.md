@@ -14,11 +14,11 @@
   - `[x]` Define Pydantic models for emails, triage, drafts in `api/models.py`
   - `[x]` Implement high-fidelity mock database in `api/db/mock_data.py`
   - `[x]` Implement email operations endpoints in `api/routes/emails.py`
-- `[ ]` **Phase 3: AI Engine & Agent OS (Python)**
-  - `[ ]` Implement Gemini API client / mock fallback in `api/ai/gemini.py`
-  - `[ ]` Design Agent OS framework `api/agents/agent_os.py`
-  - `[ ]` Develop `TriageAgent`, `SummaryAgent`, and `DraftingAgent`
-  - `[ ]` Create AI routes in `api/routes/ai.py`
+- `[x]` **Phase 3: AI Engine & Agent OS (Python)**
+  - `[x]` Implement Gemini API client / mock fallback in `api/ai/gemini.py`
+  - `[x]` Design Agent OS framework `api/agents/agent_os.py`
+  - `[x]` Develop `TriageAgent`, `SummaryAgent`, and `DraftingAgent`
+  - `[x]` Create AI routes in `api/routes/ai.py`
 - `[ ]` **Phase 4: Core State & App Layout (PWA Setup)**
   - `[ ]` Implement React Context store in `src/lib/store/store.ts`
   - `[ ]` Create `public/manifest.json` and `public/sw.js` PWA definitions
