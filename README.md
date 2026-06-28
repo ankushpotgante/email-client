@@ -109,3 +109,13 @@ To run frontend React component and store state tests:
 ```bash
 npm run test
 ```
+
+---
+
+## 🔄 Active Tab Delta Polling Strategy
+
+To ensure optimal performance and resource efficiency when deployed in serverless/cloud environments, AuraMail uses an **Active Tab Delta Polling** mechanism:
+
+1. **Client-Side Visibility Gate**: The React application runs a periodic background check every **2 minutes**. It leverages the browser's Page Visibility API (`document.visibilityState === 'visible'`). If the user switches tabs or minimizes the window, the synchronization stops immediately, saving database and server resources.
+2. **Server-Side Early Break**: In the IMAP synchronization loop, emails are fetched from newest to oldest. As soon as the backend detects an email that already exists in the database, it instantly stops processing (`break`). This ensures subsequent checks take milliseconds instead of seconds, running minimal network and SQLite overhead.
+

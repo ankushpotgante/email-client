@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useEmailStore } from "@/lib/store/store";
 import AuthScreen from "@/components/AuthScreen";
 import Sidebar from "@/components/Sidebar";
@@ -9,9 +9,45 @@ import EmailDetail from "@/components/EmailDetail";
 import ComposeModal from "@/components/ComposeModal";
 
 export default function Home() {
-  const { token, isAuthLoading } = useEmailStore();
+  const { 
+    token, 
+    isAuthLoading, 
+    activeAccountId, 
+    syncEmails, 
+    fetchEmails 
+  } = useEmailStore();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isEmailListCollapsed, setIsEmailListCollapsed] = useState(false);
+
+  // Active tab polling for new emails (every 2 minutes)
+  useEffect(() => {
+    if (!token || !activeAccountId) return;
+
+    const performSync = async () => {
+      if (document.visibilityState !== "visible") {
+        console.log("Tab is hidden, skipping active tab email sync.");
+        return;
+      }
+      console.log(`Active tab sync: Syncing account ${activeAccountId}...`);
+      try {
+        const res = await syncEmails(activeAccountId);
+        if (res.success && res.count > 0) {
+          console.log(`Active tab sync: Synced ${res.count} new emails!`);
+          await fetchEmails();
+        }
+      } catch (err) {
+        console.error("Active tab sync failed:", err);
+      }
+    };
+
+    // Run sync on mount/active account change
+    performSync();
+
+    // Check periodically every 2 minutes (120,000 ms)
+    const intervalId = setInterval(performSync, 120000);
+
+    return () => clearInterval(intervalId);
+  }, [token, activeAccountId, syncEmails, fetchEmails]);
 
   if (isAuthLoading) {
     return (

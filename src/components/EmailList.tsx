@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import { useEmailStore, Email } from "@/lib/store/store";
-import { Search, Sparkles, AlertCircle, CheckCircle2, Archive, Trash2, ArrowRight, RefreshCw, ChevronLeft } from "lucide-react";
+import { Search, Sparkles, AlertCircle, CheckCircle2, Archive, Trash2, ArrowRight, RefreshCw, ChevronLeft, Bell, Info, X } from "lucide-react";
 
 interface EmailListProps {
   isCollapsed: boolean;
@@ -12,6 +12,7 @@ interface EmailListProps {
 export default function EmailList({ isCollapsed, onToggleCollapse }: EmailListProps) {
   const {
     emails,
+    accounts,
     activeEmailId,
     searchQuery,
     priorityFocus,
@@ -29,19 +30,37 @@ export default function EmailList({ isCollapsed, onToggleCollapse }: EmailListPr
 
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [hasUnreadNotification, setHasUnreadNotification] = useState(true);
 
   const handleSync = async () => {
-    if (activeAccountId === "all") return;
     setIsSyncing(true);
     setSyncStatus(null);
     try {
-      const res = await syncEmails(activeAccountId);
-      if (res.success) {
-        setSyncStatus(`Synced ${res.count} new!`);
+      if (activeAccountId === "all") {
+        setSyncStatus("Syncing all...");
+        let totalSynced = 0;
+        for (const account of accounts) {
+          try {
+            const res = await syncEmails(account.id);
+            if (res.success) {
+              totalSynced += res.count;
+            }
+          } catch (err) {
+            console.error(`Failed to sync account ${account.id}:`, err);
+          }
+        }
+        setSyncStatus(`Synced ${totalSynced} new!`);
         setTimeout(() => setSyncStatus(null), 4000);
       } else {
-        setSyncStatus(res.error || "Sync failed");
-        setTimeout(() => setSyncStatus(null), 4000);
+        const res = await syncEmails(activeAccountId);
+        if (res.success) {
+          setSyncStatus(`Synced ${res.count} new!`);
+          setTimeout(() => setSyncStatus(null), 4000);
+        } else {
+          setSyncStatus(res.error || "Sync failed");
+          setTimeout(() => setSyncStatus(null), 4000);
+        }
       }
     } catch {
       setSyncStatus("Network error");
@@ -89,8 +108,8 @@ export default function EmailList({ isCollapsed, onToggleCollapse }: EmailListPr
       isCollapsed ? "w-0 border-r-0 opacity-0 pointer-events-none" : "w-full md:w-96 border-r border-zinc-900"
     }`}>
       {/* Search Header */}
-      <div className="p-4 border-b border-zinc-900 bg-zinc-950/50">
-        <div className="relative">
+      <div className="p-4 border-b border-zinc-900 bg-zinc-950/50 flex items-center gap-2 relative">
+        <div className="relative flex-1">
           <Search className="absolute left-3.5 top-3 w-4 h-4 text-zinc-500" />
           <input
             type="text"
@@ -100,6 +119,76 @@ export default function EmailList({ isCollapsed, onToggleCollapse }: EmailListPr
             className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 focus:outline-none focus:border-indigo-500/50 text-sm placeholder-zinc-500 text-zinc-200 transition-colors"
           />
         </div>
+        
+        {/* Notification Bell with Dropdown */}
+        <div className="relative shrink-0">
+          <button
+            onClick={() => {
+              setIsNotificationOpen(!isNotificationOpen);
+              setHasUnreadNotification(false);
+            }}
+            className={`p-2.5 rounded-xl border transition-all cursor-pointer relative flex items-center justify-center ${
+              isNotificationOpen 
+                ? "bg-zinc-800 border-zinc-700 text-zinc-100" 
+                : "bg-zinc-900 border-zinc-805 text-zinc-400 hover:text-zinc-200 hover:border-zinc-750"
+            }`}
+            title="System Alerts & Status"
+          >
+            <Bell className="w-4 h-4" />
+            {hasUnreadNotification && (
+              <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+              </span>
+            )}
+          </button>
+
+          {isNotificationOpen && (
+            <>
+              {/* Overlay Backdrop to click-away */}
+              <div 
+                className="fixed inset-0 z-40" 
+                onClick={() => setIsNotificationOpen(false)}
+              />
+              <div className="absolute right-0 mt-3 w-80 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-1 duration-100">
+                <div className="p-3 border-b border-zinc-800 bg-zinc-950/40 flex items-center justify-between">
+                  <span className="text-xs font-bold text-zinc-250 flex items-center gap-1.5 select-none">
+                    <Info className="w-3.5 h-3.5 text-indigo-400" />
+                    System Status
+                  </span>
+                  <button 
+                    onClick={() => setIsNotificationOpen(false)}
+                    className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <div className="p-3 space-y-2.5 max-h-72 overflow-y-auto">
+                  {/* Sync Warning Notification */}
+                  <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/10 flex gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="text-[11px] font-bold text-amber-300">Sync Interval Warning</h4>
+                      <p className="text-[10px] text-zinc-400 leading-normal mt-0.5">
+                        Synchronization check runs every <strong>2 minutes</strong> to fetch new emails. This occurs only while this browser tab remains visible and active to preserve serverless API execution limits.
+                      </p>
+                    </div>
+                  </div>
+                  {/* Database Persistence Info */}
+                  <div className="p-3 rounded-lg bg-zinc-950/40 border border-zinc-800/80 flex gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="text-[11px] font-bold text-zinc-300">Session Persistence</h4>
+                      <p className="text-[10px] text-zinc-500 leading-normal mt-0.5">
+                        Self-healing browser session cache is active. All connected account configurations will automatically restore across refreshes.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Feed Filter Info */}
@@ -108,26 +197,33 @@ export default function EmailList({ isCollapsed, onToggleCollapse }: EmailListPr
           {priorityFocus ? "Priority Focus" : activeFolder}
         </span>
         <div className="flex items-center gap-2">
+          {!syncStatus && (
+            <span className="text-[10px] text-zinc-500 flex items-center gap-1.5 mr-1 bg-zinc-900/60 border border-zinc-800/40 px-2 py-0.5 rounded-lg select-none" title="Active Tab Delta Polling: Synchronization occurs automatically every 2 minutes while this tab is visible.">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+              </span>
+              <span>Syncs every 2m</span>
+            </span>
+          )}
           {syncStatus && (
             <span className="text-[10px] font-bold text-indigo-400 animate-pulse bg-indigo-500/10 border border-indigo-500/10 px-2 py-0.5 rounded-full">
               {syncStatus}
             </span>
           )}
-          {activeAccountId !== "all" && (
-            <button
-              onClick={handleSync}
-              disabled={isSyncing}
-              className={`p-1.5 rounded-lg border text-zinc-400 hover:text-zinc-200 transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
-                isSyncing 
-                  ? "bg-zinc-900 border-zinc-800" 
-                  : "bg-zinc-950/40 border-zinc-850 hover:border-zinc-800"
-              }`}
-              title="Sync Account"
-            >
-              <RefreshCw className={`w-3 h-3 ${isSyncing ? "animate-spin text-indigo-400" : ""}`} />
-              <span className="text-[10px] font-bold">Sync</span>
-            </button>
-          )}
+          <button
+            onClick={handleSync}
+            disabled={isSyncing}
+            className={`p-1.5 rounded-lg border text-zinc-400 hover:text-zinc-200 transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
+              isSyncing 
+                ? "bg-zinc-900 border-zinc-800" 
+                : "bg-zinc-950/40 border-zinc-850 hover:border-zinc-800"
+            }`}
+            title="Sync Account"
+          >
+            <RefreshCw className={`w-3 h-3 ${isSyncing ? "animate-spin text-indigo-400" : ""}`} />
+            <span className="text-[10px] font-bold">Sync</span>
+          </button>
           <button
             onClick={onToggleCollapse}
             className="p-1.5 rounded-lg border bg-zinc-950/40 border-zinc-850 hover:border-zinc-800 text-zinc-400 hover:text-zinc-200 transition-all cursor-pointer flex items-center justify-center shrink-0"

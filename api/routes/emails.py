@@ -456,9 +456,9 @@ def sync_emails(account_id: str, user_id: str = Depends(get_current_user)):
             # Extract basic details
             local_id = f"imap-{account_id}-{msg_id.decode('utf-8')}"
             
-            # Check duplicate
+            # Check duplicate (delta polling: break early since older messages are already synced)
             if db.get_email_by_id(user_id, local_id):
-                continue
+                break
                 
             subject = decode_mime_header(msg.get("Subject", "(No Subject)"))
             
@@ -533,7 +533,7 @@ def sync_emails(account_id: str, user_id: str = Depends(get_current_user)):
                             smsg = email.message_from_bytes(sraw)
                             slid = f"imap-sent-{account_id}-{smsg_id.decode('utf-8')}"
                             if db.get_email_by_id(user_id, slid):
-                                continue
+                                break
                             ssubject = decode_mime_header(smsg.get("Subject", "(No Subject)"))
                             sto_header = smsg.get("To", "")
                             sto_name, sto_email_addr = email.utils.parseaddr(sto_header)

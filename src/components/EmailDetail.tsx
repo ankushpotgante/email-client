@@ -47,6 +47,7 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
   const [customPrompt, setCustomPrompt] = useState<string>("");
   const [generatedDraft, setGeneratedDraft] = useState<string>("");
   const [isDrafting, setIsDrafting] = useState<boolean>(false);
+  const [viewMode, setViewMode] = useState<"html" | "text">("html");
   const [activeTab, setActiveTab] = useState<"read" | "summary" | "reply">("read");
   const [isForwardOpen, setIsForwardOpen] = useState(false);
   const [forwardTo, setForwardTo] = useState("");
@@ -90,7 +91,10 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
     setIsForwardOpen(false);
     setIsReplyOpen(false);
     setSmartSuggestions(null);
-  }, [activeEmailId]);
+    if (email) {
+      setViewMode(email.bodyHtml ? "html" : "text");
+    }
+  }, [activeEmailId, email]);
 
   if (!email) {
     return (
@@ -347,102 +351,129 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
 
         {activeTab === "read" && (
           <>
-            {email.bodyHtml ? (
-              <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm overflow-x-hidden w-full text-zinc-900">
-                <iframe
-                  title="Email HTML Body"
-                  srcDoc={`
-                    <!DOCTYPE html>
-                    <html>
-                      <head>
-                        <meta charset="utf-8">
-                        <meta name="viewport" content="width=device-width, initial-scale=1">
-                        <style>
-                          * { box-sizing: border-box; }
-                          html, body {
-                            margin: 0;
-                            padding: 0;
-                            width: 100%;
-                            background-color: #ffffff;
+            {/* Email Body Card */}
+            <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm overflow-hidden w-full text-zinc-900 relative min-h-[460px] flex flex-col">
+              {/* Toggle HTML/Text if both exist */}
+              {email.bodyHtml && email.body && (
+                <div className="absolute top-4 right-4 flex items-center bg-zinc-100 border border-zinc-200 rounded-lg p-0.5 z-10 select-none">
+                  <button
+                    onClick={() => setViewMode("html")}
+                    className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                      viewMode === "html"
+                        ? "bg-white text-zinc-805 shadow-sm"
+                        : "text-zinc-500 hover:text-zinc-800"
+                    }`}
+                  >
+                    HTML
+                  </button>
+                  <button
+                    onClick={() => setViewMode("text")}
+                    className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                      viewMode === "text"
+                        ? "bg-white text-zinc-805 shadow-sm"
+                        : "text-zinc-500 hover:text-zinc-800"
+                    }`}
+                  >
+                    Text
+                  </button>
+                </div>
+              )}
+
+              {/* Render Content */}
+              {viewMode === "html" && email.bodyHtml ? (
+                <div className="flex-1 w-full overflow-x-hidden">
+                  <iframe
+                    title="Email HTML Body"
+                    srcDoc={`
+                      <!DOCTYPE html>
+                      <html>
+                        <head>
+                          <meta charset="utf-8">
+                          <meta name="viewport" content="width=device-width, initial-scale=1">
+                          <style>
+                            * { box-sizing: border-box; }
+                            html, body {
+                              margin: 0;
+                              padding: 0;
+                              width: 100%;
+                              background-color: #ffffff;
+                            }
+                            body {
+                              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                              font-size: 14px;
+                              line-height: 1.65;
+                              color: #222222;
+                              word-wrap: break-word;
+                              overflow-wrap: break-word;
+                              background-color: #ffffff;
+                              padding: 4px 2px;
+                            }
+                            a { color: #1a0dab; text-decoration: none; font-weight: 500; }
+                            a:hover { text-decoration: underline; }
+                            img { max-width: 100% !important; height: auto; border-radius: 4px; margin: 8px 0; display: inline-block; }
+                            p { margin: 0 0 1em 0; }
+                            p:last-child { margin-bottom: 0; }
+                            blockquote {
+                              border-left: 3px solid #e5e7eb;
+                              margin: 1em 0;
+                              padding-left: 1em;
+                              color: #555555;
+                            }
+                            ul, ol { margin: 0 0 1em 0; padding-left: 1.5em; }
+                            table { max-width: 100% !important; border-collapse: collapse; }
+                            td, th { padding: 6px; }
+                            pre, code {
+                              background-color: #f4f4f5;
+                              border: 1px solid #e4e4e7;
+                              border-radius: 6px;
+                              font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+                              font-size: 12px;
+                              color: #1f2937;
+                            }
+                            pre { padding: 12px; overflow-x: auto; }
+                            code { padding: 2px 4px; }
+                            h1,h2,h3,h4 { color: #111827; margin: 0 0 0.75em 0; }
+                            hr { border: 0; border-top: 1px solid #e5e7eb; margin: 1.5em 0; }
+                            div[style] { max-width: 100% !important; }
+                          </style>
+                        </head>
+                        <body>${email.bodyHtml}</body>
+                      </html>
+                    `}
+                    sandbox="allow-popups allow-popups-to-escape-sandbox"
+                    className="w-full border-0 bg-white block min-h-[420px]"
+                    onLoad={(e) => {
+                      try {
+                        const iframe = e.currentTarget;
+                        const resize = () => {
+                          const body = iframe.contentDocument?.body;
+                          const html = iframe.contentDocument?.documentElement;
+                          if (body && html) {
+                            const height = Math.max(
+                              body.scrollHeight,
+                              body.offsetHeight,
+                              html.clientHeight,
+                              html.scrollHeight,
+                              html.offsetHeight
+                            );
+                            iframe.style.height = `${height + 24}px`;
                           }
-                          body {
-                            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                            font-size: 14px;
-                            line-height: 1.65;
-                            color: #222222;
-                            word-wrap: break-word;
-                            overflow-wrap: break-word;
-                            background-color: #ffffff;
-                            padding: 4px 2px;
-                          }
-                          a { color: #1a0dab; text-decoration: none; font-weight: 500; }
-                          a:hover { text-decoration: underline; }
-                          img { max-width: 100% !important; height: auto; border-radius: 4px; margin: 8px 0; display: inline-block; }
-                          p { margin: 0 0 1em 0; }
-                          p:last-child { margin-bottom: 0; }
-                          blockquote {
-                            border-left: 3px solid #e5e7eb;
-                            margin: 1em 0;
-                            padding-left: 1em;
-                            color: #555555;
-                          }
-                          ul, ol { margin: 0 0 1em 0; padding-left: 1.5em; }
-                          table { max-width: 100% !important; border-collapse: collapse; }
-                          td, th { padding: 6px; }
-                          pre, code {
-                            background-color: #f4f4f5;
-                            border: 1px solid #e4e4e7;
-                            border-radius: 6px;
-                            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-                            font-size: 12px;
-                            color: #1f2937;
-                          }
-                          pre { padding: 12px; overflow-x: auto; }
-                          code { padding: 2px 4px; }
-                          h1,h2,h3,h4 { color: #111827; margin: 0 0 0.75em 0; }
-                          hr { border: 0; border-top: 1px solid #e5e7eb; margin: 1.5em 0; }
-                          div[style] { max-width: 100% !important; }
-                        </style>
-                      </head>
-                      <body>${email.bodyHtml}</body>
-                    </html>
-                  `}
-                  sandbox="allow-popups allow-popups-to-escape-sandbox"
-                  className="w-full border-0 bg-white block min-h-[420px]"
-                  onLoad={(e) => {
-                    try {
-                      const iframe = e.currentTarget;
-                      const resize = () => {
-                        const body = iframe.contentDocument?.body;
-                        const html = iframe.contentDocument?.documentElement;
-                        if (body && html) {
-                          const height = Math.max(
-                            body.scrollHeight,
-                            body.offsetHeight,
-                            html.clientHeight,
-                            html.scrollHeight,
-                            html.offsetHeight
-                          );
-                          iframe.style.height = `${height + 24}px`;
-                        }
-                      };
-                      resize();
-                      // Try again after images load
-                      setTimeout(resize, 400);
-                      setTimeout(resize, 1000);
-                    } catch (err) {
-                      console.error("Iframe resize error:", err);
-                    }
-                  }}
-                />
-              </div>
-            ) : (
-              <div className="bg-zinc-900/20 border border-zinc-900/60 rounded-2xl p-6 shadow-sm overflow-x-hidden w-full">
-                <div className="prose prose-invert max-w-none text-sm text-zinc-300 whitespace-pre-wrap break-words leading-relaxed w-full overflow-x-hidden">
+                        };
+                        resize();
+                        setTimeout(resize, 400);
+                        setTimeout(resize, 1000);
+                      } catch (err) {
+                        console.error("Iframe resize error:", err);
+                      }
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="flex-1 w-full text-zinc-800 text-sm whitespace-pre-wrap break-words leading-relaxed select-text font-sans mt-2 pr-12">
                   {email.body}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Gmail-style quick action buttons at the bottom */}
             <div className="flex gap-3 pt-6 border-t border-zinc-800/60 mt-8">
