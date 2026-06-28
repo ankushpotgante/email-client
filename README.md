@@ -1,36 +1,111 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AuraMail — AI-First Universal Email Client
 
-## Getting Started
+AuraMail is a modern, AI-first universal email client built with **Next.js (App Router, Tailwind CSS v4)** on the frontend and **FastAPI (Python, SQLite)** on the backend. It features AI-powered thread summarization, smart dynamic replies, automatic triage (priority focus sorting), and persistent IMAP synchronization.
 
-First, run the development server:
+---
 
+## 🚀 How to Run the Application
+
+You can run AuraMail in three different ways: using the **Concurrent Dev Server** (recommended for frontend/backend development), the **Unified FastAPI Server** (compiles the frontend and serves everything on a single port), or **Docker Compose**.
+
+### Prerequisite: Environment Setup
+1. Copy the example environment file to `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+2. Open `.env` and fill in your values (e.g., your `OPENAI_API_KEY` for AI features).
+
+### 💾 Database Setup & Seeding (Automatic)
+The SQLite database (`auramail.db`) is **automatically created and seeded** when you start the FastAPI backend. 
+*   On first startup, the database file is initialized, tables are migrated, and a default user (`dummy` with password `dummy`) is created.
+*   This user is pre-populated with seeded demo emails and accounts (Gmail, Outlook, IMAP) for immediate testing.
+*   No manual SQL command execution or database migration steps are required.
+
+---
+
+### Option 1: Local Development (Concurrent Mode)
+This runs both the Next.js development server (port 3000) and the FastAPI backend server (port 8000) concurrently with active hot-reloading.
+
+#### 1. Setup Backend
+Open a terminal in the project directory:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Create a Python virtual environment
+python -m venv .venv
+
+# Activate the virtual environment
+# On Windows (PowerShell):
+.\.venv\Scripts\Activate.ps1
+# On macOS/Linux:
+source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+#### 2. Setup Frontend
+In another terminal (or before starting the backend), install the Node dependencies:
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+#### 3. Start the Application
+Run the concurrent launch command:
+```bash
+npm run dev:full
+```
+*   **Frontend**: accessible at [http://localhost:3000](http://localhost:3000)
+*   **FastAPI Backend & API Docs**: accessible at [http://localhost:8000/api/docs](http://localhost:8000/api/docs)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+### Option 2: Unified FastAPI Serving (Single Port 8000)
+This mode compiles the Next.js app to a static production export (`out/` directory) and configures FastAPI to serve both the API and the static web page. Running just the FastAPI server on port 8000 serves the entire application.
 
-To learn more about Next.js, take a look at the following resources:
+1. Build the Next.js static production bundle:
+   ```bash
+   npm run build
+   ```
+2. Start the FastAPI backend:
+   ```bash
+   # Windows
+   $env:PYTHONPATH="."
+   .\.venv\Scripts\python.exe -m uvicorn api.index:app --reload --port 8000
+   
+   # macOS/Linux
+   PYTHONPATH=. .venv/bin/python -m uvicorn api.index:app --reload --port 8000
+   ```
+3. Open [http://localhost:8000](http://localhost:8000) in your browser. The entire application is hosted on port 8000.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Option 3: Running with Docker Compose
+If you have Docker installed, you can build and run both services concurrently inside isolated containers:
 
-## Deploy on Vercel
+```bash
+docker-compose up --build
+```
+*   **Frontend**: accessible at [http://localhost:3000](http://localhost:3000)
+*   **Backend**: accessible at [http://localhost:8000](http://localhost:8000)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 🧪 Testing Protocol
+
+### Run Backend Unit Tests (Pytest)
+To execute all backend test cases (API routes, email parsing, database models, and AI service fallbacks):
+
+```bash
+# Windows
+$env:PYTHONPATH="."
+.\.venv\Scripts\pytest.exe
+
+# macOS/Linux
+PYTHONPATH=. .venv/bin/pytest
+```
+
+### Run Frontend Integration Tests (Vitest)
+To run frontend React component and store state tests:
+
+```bash
+npm run test
+```
