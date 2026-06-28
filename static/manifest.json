@@ -1,0 +1,24 @@
+{
+  "short_name": "AuraMail",
+  "name": "AuraMail: AI-First Universal Email Client",
+  "description": "Premium, universal email client equipped with Smart AI prioritization, drafts, and summaries.",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#09090b",
+  "theme_color": "#6366f1",
+  "display": "standalone",
+  "orientation": "portrait"
+}

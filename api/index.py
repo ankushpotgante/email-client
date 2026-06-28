@@ -49,7 +49,7 @@ def health_check():
 # Resolve Next.js static export paths
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)
-out_dir = os.path.join(project_root, "out")
+out_dir = os.path.join(project_root, "static")
 
 # Serve Next.js SPA frontend directly from the FastAPI server if built
 if os.path.exists(out_dir):

@@ -1,8 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Static HTML export when building for production (served directly by FastAPI)
-  ...(process.env.NODE_ENV === "production" ? { output: "export" } : {}),
+  // Static HTML export when building locally (served directly by FastAPI uvicorn)
+  // On Vercel, let Vercel handle Next.js deployment natively (do not use static export)
+  ...(process.env.NODE_ENV === "production" && process.env.VERCEL !== "1" ? { output: "export" } : {}),
 
   // Allow slow IMAP sync requests more time before proxy closes connection
   httpAgentOptions: {
