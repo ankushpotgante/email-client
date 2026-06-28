@@ -1,0 +1,37 @@
+# AuraMail Tasks Checklist
+
+- `[x]` **Phase 1: Environment & Project Setup**
+  - `[x]` Create Python virtual environment and activate it
+  - `[x]` Create `requirements.txt` with backend dependencies
+  - `[x]` Install Python dependencies
+  - `[x]` Initialize Next.js project in root directory
+  - `[x]` Install frontend dev dependencies (Tailwind v4, PostCSS, Lucide, Vitest)
+  - `[x]` Configure `next.config.mjs` with dev server API proxies (configured in next.config.ts)
+  - `[x]` Create `postcss.config.mjs` and configure Tailwind CSS v4 in `src/app/globals.css`
+  - `[x]` Set up Vitest testing config
+- `[x]` **Phase 2: FastAPI Core & Data Simulation**
+  - `[x]` Implement `/api/index.py` FastAPI app and CORS
+  - `[x]` Define Pydantic models for emails, triage, drafts in `api/models.py`
+  - `[x]` Implement high-fidelity mock database in `api/db/mock_data.py`
+  - `[x]` Implement email operations endpoints in `api/routes/emails.py`
+- `[ ]` **Phase 3: AI Engine & Agent OS (Python)**
+  - `[ ]` Implement Gemini API client / mock fallback in `api/ai/gemini.py`
+  - `[ ]` Design Agent OS framework `api/agents/agent_os.py`
+  - `[ ]` Develop `TriageAgent`, `SummaryAgent`, and `DraftingAgent`
+  - `[ ]` Create AI routes in `api/routes/ai.py`
+- `[ ]` **Phase 4: Core State & App Layout (PWA Setup)**
+  - `[ ]` Implement React Context store in `src/lib/store/store.ts`
+  - `[ ]` Create `public/manifest.json` and `public/sw.js` PWA definitions
+  - `[ ]` Build layout wrappers and `Sidebar` switcher
+- `[ ]` **Phase 5: Interactive UI Components (Tailwind v4)**
+  - `[ ]` Build unified list `EmailList.tsx` with scroll & swipe styles
+  - `[ ]` Build detail pane `EmailDetail.tsx` with summary cards & smart reply hooks
+  - `[ ]` Build compose modal `ComposeModal.tsx`
+  - `[ ]` UI Polish & transitions (Outfit font, animations, inbox zero confetti)
+- `[ ]` **Phase 6: Testing, Polish & Documentation**
+  - `[ ]` Write backend unit tests in `api/tests/` and verify with Pytest
+  - `[ ]` Write frontend tests for stores & page actions
+  - `[ ]` Generate `GEMINI.md` CLI playbook
+  - `[ ]` Generate `architecture.md`
+  - `[ ]` Generate `agents_workflow.md`
+  - `[ ]` Build verification and final deployment sanity checks
