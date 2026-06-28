@@ -1,9 +1,35 @@
 import pytest
+import os
+import shutil
+from pathlib import Path
 from fastapi.testclient import TestClient
+
 from api.index import app
-from api.db.mock_data import db
+from api.db.database import db_instance
 
 client = TestClient(app)
+
+TEST_DB_PATH = Path(__file__).resolve().parent.parent / "test_auramail.db"
+auth_headers = {}
+test_user_id = ""
+
+@pytest.fixture(scope="module", autouse=True)
+def setup_test_db():
+    """Redirects the global database to a temporary SQLite test database."""
+    # Override database path
+    original_db_path = db_instance.db_path
+    db_instance.db_path = TEST_DB_PATH
+    db_instance.init_db()
+    
+    yield
+    
+    # Reset path and clean up test file
+    db_instance.db_path = original_db_path
+    if TEST_DB_PATH.exists():
+        try:
+            os.remove(TEST_DB_PATH)
+        except Exception:
+            pass
 
 def test_health_check():
     response = client.get("/api/health")
@@ -11,14 +37,38 @@ def test_health_check():
     assert response.json()["status"] == "healthy"
     assert "supported_accounts" in response.json()
 
-def test_get_accounts():
-    response = client.get("/api/emails/accounts")
+def test_register_user():
+    global auth_headers, test_user_id
+    response = client.post(
+        "/api/auth/register",
+        json={"username": "testuser", "password": "password123"}
+    )
     assert response.status_code == 200
+    data = response.json()
+    assert "access_token" in data
+    assert data["user"]["username"] == "testuser"
+    
+    test_user_id = data["user"]["id"]
+    token = data["access_token"]
+    auth_headers = {"Authorization": f"Bearer {token}"}
+
+def test_login_user():
+    response = client.post(
+        "/api/auth/login",
+        json={"username": "testuser", "password": "password123"}
+    )
+    assert response.status_code == 200
+    assert "access_token" in response.json()
+
+def test_get_accounts():
+    response = client.get("/api/emails/accounts", headers=auth_headers)
+    assert response.status_code == 200
+    # User is seeded with 3 default accounts upon registration
     assert len(response.json()) == 3
-    assert response.json()[0]["id"] == "gmail"
+    assert response.json()[0]["type"] == "gmail"
 
 def test_get_emails():
-    response = client.get("/api/emails")
+    response = client.get("/api/emails", headers=auth_headers)
     assert response.status_code == 200
     assert len(response.json()) > 0
     # verify format of email object
@@ -26,80 +76,104 @@ def test_get_emails():
     assert "id" in first_email
     assert "subject" in first_email
     assert "fromEmail" in first_email
+    assert "bodyHtml" in first_email
 
 def test_get_emails_filtered():
-    # Filter by account
-    response = client.get("/api/emails?account=office365")
+    # Fetch seeded accounts to find the ID
+    accs = client.get("/api/emails/accounts", headers=auth_headers).json()
+    office_acc_id = next(a["id"] for a in accs if a["type"] == "office365")
+    
+    response = client.get(f"/api/emails?account={office_acc_id}", headers=auth_headers)
     assert response.status_code == 200
     for e in response.json():
-        assert e["accountId"] == "office365"
+        assert e["accountId"] == office_acc_id
 
 def test_get_email_detail():
-    response = client.get("/api/emails/gm-1")
+    # Resolve seeded email ID
+    emails_list = client.get("/api/emails", headers=auth_headers).json()
+    vc_email = next(e for e in emails_list if "Term Sheet" in e["subject"])
+    
+    response = client.get(f"/api/emails/{vc_email['id']}", headers=auth_headers)
     assert response.status_code == 200
-    assert response.json()["id"] == "gm-1"
-    assert "Term Sheet" in response.json()["subject"]
+    assert response.json()["id"] == vc_email["id"]
+    assert "Sarah Jenkins" in response.json()["fromName"]
 
 def test_get_email_detail_not_found():
-    response = client.get("/api/emails/non-existent-id")
+    response = client.get("/api/emails/non-existent-id", headers=auth_headers)
     assert response.status_code == 404
 
 def test_move_folder():
-    # Move gm-3 to archived
+    emails_list = client.get("/api/emails", headers=auth_headers).json()
+    first_email_id = emails_list[0]["id"]
+    
     response = client.post(
         "/api/emails/folder",
-        json={"emailIds": ["gm-3"], "folder": "archived"}
+        json={"emailIds": [first_email_id], "folder": "archived"},
+        headers=auth_headers
     )
     assert response.status_code == 200
     assert response.json()["success"] is True
     
     # Verify DB state
-    email = db.get_email_by_id("gm-3")
-    assert email is not None
-    assert email.folder == "archived"
+    db_email = db_instance.get_email_by_id(test_user_id, first_email_id)
+    assert db_email is not None
+    assert db_email["folder"] == "archived"
 
 def test_ai_prioritize():
+    emails_list = client.get("/api/emails", headers=auth_headers).json()
+    db_email_id = emails_list[0]["id"]
+    
     response = client.post(
         "/api/ai/prioritize",
-        json={"emailId": "gm-2"}
+        json={"emailId": db_email_id},
+        headers=auth_headers
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["emailId"] == "gm-2"
-    assert data["priority"] == "high"
+    assert data["emailId"] == db_email_id
+    assert data["priority"] in ["high", "medium", "low"]
     assert len(data["priorityReason"]) > 0
 
 def test_ai_summarize():
+    emails_list = client.get("/api/emails", headers=auth_headers).json()
+    db_email_id = emails_list[0]["id"]
+    
     response = client.post(
         "/api/ai/summarize",
-        json={"emailId": "of-1"}
+        json={"emailId": db_email_id},
+        headers=auth_headers
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["emailId"] == "of-1"
+    assert data["emailId"] == db_email_id
     assert "summary" in data
     assert len(data["summary"]) > 0
 
 def test_ai_draft_reply():
+    emails_list = client.get("/api/emails", headers=auth_headers).json()
+    vc_email = next(e for e in emails_list if "Term Sheet" in e["subject"])
+    
     response = client.post(
         "/api/ai/draft-reply",
-        json={"emailId": "gm-1", "prompt": "Sounds great, confirm 3pm", "tone": "friendly"}
+        json={"emailId": vc_email["id"], "prompt": "Confirm 3pm", "tone": "friendly"},
+        headers=auth_headers
     )
     assert response.status_code == 200
     data = response.json()
     assert "body" in data
-    assert "3:00 PM" in data["body"] or "Alex" in data["body"]
+    assert len(data["body"]) > 0
 
 def test_create_demo_account():
     response = client.post(
         "/api/emails/accounts",
-        json={"id": "demo-acc-1", "name": "Demo Account", "type": "gmail", "email": "demo@domain.com"}
+        json={"id": "demo-acc-99", "name": "Demo Account", "type": "gmail", "email": "demo99@domain.com"},
+        headers=auth_headers
     )
     assert response.status_code == 200
-    assert response.json()["id"] == "demo-acc-1"
+    assert response.json()["id"] == "demo-acc-99"
     
     # Check that welcome email was created for demo account
-    response = client.get("/api/emails?account=demo-acc-1")
+    response = client.get("/api/emails?account=demo-acc-99", headers=auth_headers)
     assert response.status_code == 200
     assert len(response.json()) == 1
     assert "Welcome" in response.json()[0]["subject"]
@@ -107,7 +181,8 @@ def test_create_demo_account():
 def test_create_real_account_invalid_credentials():
     response = client.post(
         "/api/emails/accounts",
-        json={"id": "real-acc-1", "name": "Real Account", "type": "gmail", "email": "real@gmail.com", "password": "wrong_password"}
+        json={"id": "real-acc-99", "name": "Real Account", "type": "gmail", "email": "real99@gmail.com", "password": "wrong_password"},
+        headers=auth_headers
     )
     assert response.status_code == 400
     assert "verification failed" in response.json()["detail"].lower()

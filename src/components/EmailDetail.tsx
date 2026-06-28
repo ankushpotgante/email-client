@@ -258,9 +258,81 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
         {/* Active Content Tabs */}
         {activeTab === "read" && (
           <div className="bg-zinc-900/20 border border-zinc-900/60 rounded-2xl p-6 shadow-sm overflow-x-hidden w-full">
-            <div className="prose prose-invert max-w-none text-sm text-zinc-300 whitespace-pre-wrap break-words leading-relaxed w-full overflow-x-hidden">
-              {email.body}
-            </div>
+            {email.bodyHtml ? (
+              <iframe
+                title="Email HTML Body"
+                srcDoc={`
+                  <!DOCTYPE html>
+                  <html>
+                    <head>
+                      <meta charset="utf-8">
+                      <style>
+                        body {
+                          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                          font-size: 13.5px;
+                          line-height: 1.6;
+                          color: #d4d4d8; /* zinc-300 */
+                          margin: 0;
+                          padding: 0;
+                          word-wrap: break-word;
+                          overflow-wrap: break-word;
+                          background-color: transparent;
+                        }
+                        a { color: #818cf8; text-decoration: none; font-weight: 500; }
+                        a:hover { text-decoration: underline; }
+                        img { max-w: 100%; height: auto; border-radius: 8px; margin: 8px 0; }
+                        p { margin: 0 0 1em 0; }
+                        p:last-child { margin-bottom: 0; }
+                        blockquote {
+                          border-left: 3px solid #3f3f46; /* zinc-700 */
+                          margin: 1em 0;
+                          padding-left: 1em;
+                          color: #a1a1aa; /* zinc-400 */
+                        }
+                        ul, ol { margin: 0 0 1em 0; padding-left: 1.5em; }
+                        pre {
+                          background-color: #18181b; /* zinc-900 */
+                          border: 1px solid #27272a;
+                          padding: 12px;
+                          border-radius: 8px;
+                          overflow-x: auto;
+                          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+                          font-size: 12px;
+                        }
+                      </style>
+                    </head>
+                    <body>
+                      ${email.bodyHtml}
+                    </body>
+                  </html>
+                `}
+                sandbox="allow-popups allow-popups-to-escape-sandbox"
+                className="w-full border-0 bg-transparent block"
+                style={{
+                  height: "250px", // Initial fallback
+                  colorScheme: "dark"
+                }}
+                onLoad={(e) => {
+                  try {
+                    const iframe = e.currentTarget;
+                    if (iframe.contentWindow) {
+                      setTimeout(() => {
+                        const body = iframe.contentDocument?.body;
+                        if (body) {
+                          iframe.style.height = `${body.scrollHeight + 16}px`;
+                        }
+                      }, 150);
+                    }
+                  } catch (err) {
+                    console.error("Iframe load resize error:", err);
+                  }
+                }}
+              />
+            ) : (
+              <div className="prose prose-invert max-w-none text-sm text-zinc-300 whitespace-pre-wrap break-words leading-relaxed w-full overflow-x-hidden">
+                {email.body}
+              </div>
+            )}
           </div>
         )}
 

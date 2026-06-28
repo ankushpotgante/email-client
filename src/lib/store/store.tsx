@@ -7,6 +7,7 @@ export interface Account {
   name: string;
   type: string;
   email: string;
+  password?: string;
 }
 
 export interface Email {
@@ -17,6 +18,7 @@ export interface Email {
   toEmail: string;
   subject: string;
   body: string;
+  bodyHtml?: string;
   date: string;
   folder: string;
   labels: string[];
@@ -39,6 +41,11 @@ interface EmailContextType {
   isLoadingSummary: boolean;
   summaryCache: Record<string, string>; // emailId -> summary text
   
+  // Authentication states
+  token: string | null;
+  user: { id: string; username: string } | null;
+  isAuthLoading: boolean;
+  
   // Actions
   setActiveAccountId: (id: string) => void;
   setActiveFolder: (folder: string) => void;
@@ -46,6 +53,10 @@ interface EmailContextType {
   setSearchQuery: (query: string) => void;
   setPriorityFocus: (focus: boolean) => void;
   setIsComposeOpen: (open: boolean) => void;
+  
+  login: (username: string, password: string) => Promise<boolean>;
+  register: (username: string, password: string) => Promise<boolean>;
+  logout: () => void;
   
   fetchAccounts: () => Promise<void>;
   fetchEmails: () => Promise<void>;
@@ -76,10 +87,97 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isLoadingSummary, setIsLoadingSummary] = useState<boolean>(false);
   const [summaryCache, setSummaryCache] = useState<Record<string, string>>({});
 
+  // Auth local states
+  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState<{ id: string; username: string } | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+
+  // Initialize and load auth state from local storage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const cachedToken = localStorage.getItem("auramail_token");
+      const cachedUser = localStorage.getItem("auramail_user");
+      if (cachedToken && cachedUser) {
+        setToken(cachedToken);
+        setUser(JSON.parse(cachedUser));
+      }
+      setIsAuthLoading(false);
+    }
+  }, []);
+
+  // Helper to generate auth headers
+  const getRequestHeaders = useCallback((extraHeaders: Record<string, string> = {}) => {
+    const headers: Record<string, string> = { ...extraHeaders };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    return headers;
+  }, [token]);
+
+  // Auth Operations
+  const login = async (username: string, password: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setToken(data.access_token);
+        setUser(data.user);
+        localStorage.setItem("auramail_token", data.access_token);
+        localStorage.setItem("auramail_user", JSON.stringify(data.user));
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.error("Login failed:", e);
+      return false;
+    }
+  };
+
+  const register = async (username: string, password: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setToken(data.access_token);
+        setUser(data.user);
+        localStorage.setItem("auramail_token", data.access_token);
+        localStorage.setItem("auramail_user", JSON.stringify(data.user));
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.error("Registration failed:", e);
+      return false;
+    }
+  };
+
+  const logout = () => {
+    setToken(null);
+    setUser(null);
+    setAccounts([]);
+    setEmails([]);
+    setActiveEmailId(null);
+    setActiveAccountId("all");
+    setActiveFolder("inbox");
+    localStorage.removeItem("auramail_token");
+    localStorage.removeItem("auramail_user");
+  };
+
   // Fetch all accounts
   const fetchAccounts = useCallback(async () => {
+    if (!token) return;
     try {
-      const res = await fetch(`${API_BASE}/emails/accounts`);
+      const res = await fetch(`${API_BASE}/emails/accounts`, {
+        headers: getRequestHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         setAccounts(data);
@@ -87,10 +185,11 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (e) {
       console.error("Failed to fetch accounts:", e);
     }
-  }, []);
+  }, [token, getRequestHeaders]);
 
   // Fetch emails matching active filters
   const fetchEmails = useCallback(async () => {
+    if (!token) return;
     setIsLoadingEmails(true);
     try {
       const params = new URLSearchParams();
@@ -104,7 +203,9 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         params.append("q", searchQuery);
       }
       
-      const res = await fetch(`${API_BASE}/emails?${params.toString()}`);
+      const res = await fetch(`${API_BASE}/emails?${params.toString()}`, {
+        headers: getRequestHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         setEmails(data);
@@ -114,24 +215,29 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } finally {
       setIsLoadingEmails(false);
     }
-  }, [activeAccountId, activeFolder, searchQuery]);
+  }, [token, activeAccountId, activeFolder, searchQuery, getRequestHeaders]);
 
   // Load accounts initially
   useEffect(() => {
-    fetchAccounts();
-  }, [fetchAccounts]);
+    if (token) {
+      fetchAccounts();
+    }
+  }, [token, fetchAccounts]);
 
   // Load emails when filters change
   useEffect(() => {
-    fetchEmails();
-  }, [fetchEmails]);
+    if (token) {
+      fetchEmails();
+    }
+  }, [token, fetchEmails]);
 
   // Move emails to folder (Archive, Delete, Inbox, etc.)
   const moveToFolder = async (emailIds: string[], folder: string) => {
+    if (!token) return;
     try {
       const res = await fetch(`${API_BASE}/emails/folder`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getRequestHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ emailIds, folder })
       });
       if (res.ok) {
@@ -148,9 +254,11 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Toggle read/unread status
   const toggleReadStatus = async (emailIds: string[], read: boolean) => {
+    if (!token) return;
     try {
       const res = await fetch(`${API_BASE}/emails/read?read=${read}&emailIds=${emailIds.join("&emailIds=")}`, {
-        method: "POST"
+        method: "POST",
+        headers: getRequestHeaders()
       });
       if (res.ok) {
         // Update local list state
@@ -165,10 +273,11 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Compose and send email
   const sendEmail = async (accountId: string, toEmail: string, subject: string, body: string) => {
+    if (!token) return false;
     try {
       const res = await fetch(`${API_BASE}/emails/compose`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getRequestHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ accountId, toEmail, subject, body })
       });
       if (res.ok) {
@@ -186,6 +295,7 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Fetch AI Summary of an email thread
   const getAISummary = async (emailId: string): Promise<string> => {
+    if (!token) return "";
     if (summaryCache[emailId]) {
       return summaryCache[emailId];
     }
@@ -194,7 +304,7 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       const res = await fetch(`${API_BASE}/ai/summarize`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getRequestHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ emailId })
       });
       
@@ -220,10 +330,11 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Re-run AI Triage for email
   const triggerAITriage = async (emailId: string) => {
+    if (!token) return;
     try {
       const res = await fetch(`${API_BASE}/ai/prioritize`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getRequestHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ emailId })
       });
       if (res.ok) {
@@ -244,10 +355,11 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Generate an AI draft response
   const generateAIDraft = async (emailId: string, prompt: string, tone: string): Promise<string> => {
+    if (!token) return "";
     try {
       const res = await fetch(`${API_BASE}/ai/draft-reply`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getRequestHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ emailId, prompt, tone })
       });
       if (res.ok) {
@@ -262,11 +374,12 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const addAccount = async (name: string, email: string, type: string, password?: string): Promise<boolean> => {
+    if (!token) return false;
     try {
       const id = `${type}-${name.toLowerCase().replace(/[^a-z0-9]/g, "-")}-${Math.floor(Math.random() * 1000)}`;
       const res = await fetch(`${API_BASE}/emails/accounts`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getRequestHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ id, name, type, email, password })
       });
       if (res.ok) {
@@ -282,9 +395,11 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const syncEmails = async (accountId: string): Promise<{ success: boolean; count: number; error?: string }> => {
+    if (!token) return { success: false, count: 0, error: "Unauthorized" };
     try {
       const res = await fetch(`${API_BASE}/emails/${accountId}/sync`, {
-        method: "POST"
+        method: "POST",
+        headers: getRequestHeaders()
       });
       if (res.ok) {
         const data = await res.json();
@@ -314,12 +429,18 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isLoadingEmails,
         isLoadingSummary,
         summaryCache,
+        token,
+        user,
+        isAuthLoading,
         setActiveAccountId,
         setActiveFolder,
         setActiveEmailId,
         setSearchQuery,
         setPriorityFocus,
         setIsComposeOpen,
+        login,
+        register,
+        logout,
         fetchAccounts,
         fetchEmails,
         moveToFolder,

@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.routes.emails import router as emails_router
 from api.routes.ai import router as ai_router
+from api.routes.auth import router as auth_router
 
 app = FastAPI(
     title="AuraMail API", 
@@ -23,6 +24,7 @@ app.add_middleware(
 # Register routers under prefix '/api'
 app.include_router(emails_router, prefix="/api")
 app.include_router(ai_router, prefix="/api")
+app.include_router(auth_router, prefix="/api")
 
 @app.get("/api/health")
 def health_check():

@@ -35,3 +35,14 @@
   - `[x]` Generate `architecture.md`
   - `[x]` Generate `agents_workflow.md`
   - `[x]` Build verification and final deployment sanity checks
+- `[x]` **Phase 7: Persistent User Management & HTML Email Rendering**
+  - `[x]` Update requirements.txt and install pyjwt, cryptography, and bcrypt
+  - `[x]` Create SQLite database module `api/db/database.py` with schema migrations
+  - `[x]` Implement secure hashing & AES Fernet credential encryption in `api/auth.py`
+  - `[x]` Create registration and login endpoints in `api/routes/auth.py`
+  - `[x]` Add get_current_user token validation to all email and account API routes
+  - `[x]` Modify IMAP sync in `api/routes/emails.py` to extract and store HTML body content
+  - `[x]` Create login & registration screen `src/components/AuthScreen.tsx`
+  - `[x]` Update React store Context in `store.tsx` to handle authentication states and headers
+  - `[x]` Implement secure sandbox iframe email HTML body rendering in `EmailDetail.tsx`
+  - `[x]` Write backend auth test specs in `api/tests/test_backend.py` and run verification tests

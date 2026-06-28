@@ -176,13 +176,12 @@ def auto_triage_on_received(email_id: str, email_data: dict):
         triage_json = triage_agent.run(email_text, json_mode=True)
         triage_result = json.loads(triage_json)
         
-        # update mock db entry directly if exists
-        from api.db.mock_data import db
-        email = db.get_email_by_id(email_id)
-        if email:
-            email.priority = triage_result.get("priority", "medium")
-            email.priority_reason = triage_result.get("reason", "")
-            logger.info(f"Email {email_id} successfully auto-triaged to {email.priority.upper()}")
+        # update SQLite database entry directly
+        from api.db.database import db_instance
+        priority = triage_result.get("priority", "medium")
+        reason = triage_result.get("reason", "")
+        db_instance.update_email_triage_by_id_only(email_id, priority, reason)
+        logger.info(f"Email {email_id} successfully auto-triaged to {priority.upper()}")
     except Exception as e:
         logger.error(f"Failed to auto-triage email {email_id}: {e}")
 

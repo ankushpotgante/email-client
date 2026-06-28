@@ -72,6 +72,10 @@ const TestComponent = () => {
 describe("React Store Context API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    if (typeof window !== "undefined") {
+      localStorage.setItem("auramail_token", "mock-access-token-12345");
+      localStorage.setItem("auramail_user", JSON.stringify({ id: "mock-user-id", username: "mockuser" }));
+    }
   });
 
   it("initializes defaults and fetches API data on load", async () => {

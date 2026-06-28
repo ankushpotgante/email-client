@@ -16,6 +16,7 @@ class Email(BaseModel):
     to_email: str = Field(..., alias="toEmail")
     subject: str
     body: str
+    body_html: Optional[str] = Field(None, alias="bodyHtml")
     date: str
     folder: str  # inbox, archived, trash, sent, drafts
     labels: List[str] = Field(default_factory=list)

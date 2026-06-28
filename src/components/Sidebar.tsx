@@ -15,7 +15,8 @@ import {
   ChevronRight,
   User, 
   Layers,
-  Inbox
+  Inbox,
+  LogOut
 } from "lucide-react";
 
 interface SidebarProps {
@@ -33,7 +34,8 @@ export default function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps)
     setActiveAccountId,
     setActiveFolder,
     setPriorityFocus,
-    setIsComposeOpen
+    setIsComposeOpen,
+    logout
   } = useEmailStore();
 
   const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false);
@@ -185,7 +187,7 @@ export default function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps)
                   </button>
                 ))}
               </div>
-              <div className="p-1.5 border-t border-zinc-800/50 bg-zinc-950/20">
+              <div className="p-1.5 border-t border-zinc-800/50 bg-zinc-950/20 flex flex-col gap-1">
                 <button
                   onClick={() => {
                     setIsAddAccountOpen(true);
@@ -195,6 +197,16 @@ export default function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps)
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Connect Account</span>
+                </button>
+                <button
+                  onClick={() => {
+                    logout();
+                    setIsAccountDropdownOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2.5 p-2 rounded-lg text-[10px] font-bold text-rose-450 hover:bg-rose-500/10 hover:text-rose-400 transition-colors text-left cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Sign Out</span>
                 </button>
               </div>
             </div>
