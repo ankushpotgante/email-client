@@ -37,6 +37,7 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
     moveToFolder,
     toggleReadStatus,
     setIsComposeOpen,
+    sendEmail,
     token,
     forwardEmail
   } = useEmailStore();
@@ -54,6 +55,10 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
   const [smartSuggestions, setSmartSuggestions] = useState<Array<{label: string; prompt: string}> | null>(null);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const forwardInputRef = React.useRef<HTMLInputElement>(null);
+  const [isReplyOpen, setIsReplyOpen] = useState(false);
+  const [replyBody, setReplyBody] = useState("");
+  const [isSendingReply, setIsSendingReply] = useState(false);
+  const replyInputRef = React.useRef<HTMLTextAreaElement>(null);
 
   // Auto-focus on Forward input when composer is toggled open
   useEffect(() => {
@@ -64,18 +69,26 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
     }
   }, [isForwardOpen]);
 
+  // Auto-focus on Reply input when composer is toggled open
+  useEffect(() => {
+    if (isReplyOpen) {
+      setTimeout(() => {
+        replyInputRef.current?.focus();
+      }, 50);
+    }
+  }, [isReplyOpen]);
+
   // Find the currently selected email
   const email = emails.find((e) => e.id === activeEmailId);
 
   // Reset tab and drafts when email selection changes
   useEffect(() => {
     setAiSummary("");
-    setGeneratedDraft("");
+    setReplyBody("");
     setCustomPrompt("");
     setActiveTab("read");
     setIsForwardOpen(false);
-    setForwardTo("");
-    setForwardNote("");
+    setIsReplyOpen(false);
     setSmartSuggestions(null);
   }, [activeEmailId]);
 
@@ -121,7 +134,7 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
     try {
       const promptText = promptOverride || customPrompt;
       const draft = await generateAIDraft(email.id, promptText, draftTone);
-      setGeneratedDraft(draft);
+      setReplyBody(draft);
     } catch (e) {
       console.error(e);
     } finally {
@@ -178,19 +191,31 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
     }
   };
 
-  // Insert generated draft into main Compose window
-  const handleInsertIntoComposer = () => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("auramail_draft_to", email.fromEmail);
-      localStorage.setItem("auramail_draft_subject", `Re: ${email.subject}`);
-      localStorage.setItem("auramail_draft_body", generatedDraft);
+  // Send Reply handler
+  const handleSendReply = async () => {
+    if (!replyBody || !email) return;
+    setIsSendingReply(true);
+    try {
+      const success = await sendEmail(
+        email.accountId,
+        email.fromEmail,
+        email.subject.startsWith("Re:") ? email.subject : `Re: ${email.subject}`,
+        replyBody
+      );
+      if (success) {
+        setIsReplyOpen(false);
+        setReplyBody("");
+        canvasConfetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.8 }
+        });
+      }
+    } catch (e) {
+      console.error("Failed to send reply:", e);
+    } finally {
+      setIsSendingReply(false);
     }
-    setIsComposeOpen(true);
-    canvasConfetti({
-      particleCount: 50,
-      spread: 60,
-      origin: { y: 0.8 }
-    });
   };
 
   return (
@@ -422,14 +447,20 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
             {/* Gmail-style quick action buttons at the bottom */}
             <div className="flex gap-3 pt-6 border-t border-zinc-800/60 mt-8">
               <button
-                onClick={handleOpenReplyTab}
+                onClick={() => {
+                  setIsReplyOpen(true);
+                  setIsForwardOpen(false);
+                }}
                 className="flex items-center gap-2 px-5 py-2 border border-zinc-800/80 hover:bg-zinc-850 hover:text-zinc-200 text-zinc-400 hover:border-zinc-700 rounded-full text-xs font-semibold transition-all cursor-pointer"
               >
                 <CornerUpLeft className="w-4 h-4 text-zinc-500" />
                 <span>Reply</span>
               </button>
               <button
-                onClick={() => setIsForwardOpen(true)}
+                onClick={() => {
+                  setIsForwardOpen(true);
+                  setIsReplyOpen(false);
+                }}
                 className="flex items-center gap-2 px-5 py-2 border border-zinc-800/80 hover:bg-zinc-850 hover:text-zinc-200 text-zinc-400 hover:border-zinc-700 rounded-full text-xs font-semibold transition-all cursor-pointer"
               >
                 <Forward className="w-4 h-4 text-zinc-500" />
@@ -512,6 +543,72 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
                       <span>Send</span>
                     </button>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Inline Gmail-style Reply Composer */}
+            {isReplyOpen && (
+              <div className="border border-indigo-500/20 bg-indigo-500/2 rounded-2xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-200 mt-6">
+                <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                  <div className="flex items-center gap-2 text-indigo-400">
+                    <CornerUpLeft className="w-4 h-4" />
+                    <span className="text-xs font-bold uppercase tracking-wider">Reply Message</span>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setIsReplyOpen(false);
+                      setReplyBody("");
+                    }} 
+                    className="text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                
+                <div className="space-y-3">
+                  {/* Recipient block */}
+                  <div className="flex items-center gap-3 bg-zinc-950/40 px-4 py-3 rounded-xl border border-zinc-850 transition-all text-xs text-zinc-400">
+                    <span className="text-zinc-500 font-bold shrink-0">To:</span>
+                    <span>{email.fromName} &lt;{email.fromEmail}&gt;</span>
+                  </div>
+
+                  {/* Body input */}
+                  <div className="bg-zinc-950/40 p-4 rounded-xl border border-zinc-855 focus-within:border-indigo-500/30 transition-all relative">
+                    <textarea
+                      ref={replyInputRef}
+                      value={replyBody}
+                      onChange={(e) => setReplyBody(e.target.value)}
+                      placeholder={`Reply to ${email.fromName}...`}
+                      rows={6}
+                      className="w-full bg-transparent text-xs text-zinc-200 placeholder-zinc-650 focus:outline-none resize-none leading-relaxed"
+                    />
+                  </div>
+                </div>
+
+                {/* Actions row */}
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    onClick={() => {
+                      setIsReplyOpen(false);
+                      setReplyBody("");
+                    }}
+                    className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850 rounded-xl transition-all cursor-pointer"
+                  >
+                    Discard
+                  </button>
+                  <button
+                    onClick={handleSendReply}
+                    disabled={!replyBody || isSendingReply}
+                    className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-650 disabled:bg-zinc-850 disabled:text-zinc-600 text-white text-xs font-bold shadow-md shadow-indigo-500/10 transition-all cursor-pointer"
+                  >
+                    {isSendingReply ? (
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Send className="w-3.5 h-3.5" />
+                    )}
+                    <span>Send</span>
+                  </button>
                 </div>
               </div>
             )}
@@ -603,40 +700,62 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
               </div>
             </div>
 
-            {/* Generated Output Preview */}
-            {(isDrafting || generatedDraft) && (
-              <div className="bg-zinc-900/10 border border-zinc-900 rounded-2xl p-6 space-y-4">
-                <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
-                  <span className="text-xs font-bold text-indigo-400 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>AI Draft Output</span>
-                  </span>
-                  
-                  {generatedDraft && !isDrafting && (
-                    <button
-                      onClick={handleInsertIntoComposer}
-                      className="flex items-center gap-1 text-xs font-bold bg-indigo-500 hover:bg-indigo-600 text-white py-1 px-3 rounded-lg transition-colors cursor-pointer"
-                    >
-                      <span>Insert to Composer</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+            {/* Always visible Reply Composer below creator tools */}
+            <div className="border border-indigo-500/20 bg-indigo-500/2 rounded-2xl p-5 space-y-4 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between border-b border-zinc-805 pb-3">
+                <div className="flex items-center gap-2 text-indigo-400">
+                  <CornerUpLeft className="w-4 h-4" />
+                  <span className="text-xs font-bold uppercase tracking-wider">Reply Draft Composer</span>
+                </div>
+              </div>
+              
+              <div className="space-y-3">
+                {/* Recipient block */}
+                <div className="flex items-center gap-3 bg-zinc-950/40 px-4 py-3 rounded-xl border border-zinc-850 transition-all text-xs text-zinc-400">
+                  <span className="text-zinc-500 font-bold shrink-0">To:</span>
+                  <span>{email.fromName} &lt;{email.fromEmail}&gt;</span>
                 </div>
 
-                {isDrafting ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-zinc-500 space-y-2">
-                    <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-                    <span className="text-xs font-medium">Generating email response...</span>
-                  </div>
-                ) : (
-                  <div className="bg-zinc-950/40 p-4 border border-zinc-900 rounded-xl">
-                    <pre className="text-xs text-zinc-300 font-sans whitespace-pre-wrap leading-relaxed">
-                      {generatedDraft}
-                    </pre>
-                  </div>
-                )}
+                {/* Body input */}
+                <div className="bg-zinc-950/40 p-4 rounded-xl border border-zinc-855 focus-within:border-indigo-500/30 transition-all relative">
+                  {isDrafting && (
+                    <div className="absolute inset-0 bg-zinc-950/70 rounded-xl flex items-center justify-center text-zinc-400 text-xs font-medium space-x-2 z-10">
+                      <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                      <span>AI is drafting your response...</span>
+                    </div>
+                  )}
+                  <textarea
+                    value={replyBody}
+                    onChange={(e) => setReplyBody(e.target.value)}
+                    placeholder={`Edit the draft response here or write your own...`}
+                    rows={8}
+                    className="w-full bg-transparent text-xs text-zinc-200 placeholder-zinc-650 focus:outline-none resize-none leading-relaxed min-h-[160px]"
+                  />
+                </div>
               </div>
-            )}
+
+              {/* Actions row */}
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  onClick={() => setReplyBody("")}
+                  className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850 rounded-xl transition-all cursor-pointer"
+                >
+                  Clear Draft
+                </button>
+                <button
+                  onClick={handleSendReply}
+                  disabled={!replyBody || isSendingReply || isDrafting}
+                  className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-650 disabled:bg-zinc-850 disabled:text-zinc-600 text-white text-xs font-bold shadow-md shadow-indigo-500/10 transition-all cursor-pointer"
+                >
+                  {isSendingReply ? (
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Send className="w-3.5 h-3.5" />
+                  )}
+                  <span>Send</span>
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
