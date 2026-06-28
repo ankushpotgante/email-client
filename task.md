@@ -19,10 +19,10 @@
   - `[x]` Design Agent OS framework `api/agents/agent_os.py`
   - `[x]` Develop `TriageAgent`, `SummaryAgent`, and `DraftingAgent`
   - `[x]` Create AI routes in `api/routes/ai.py`
-- `[ ]` **Phase 4: Core State & App Layout (PWA Setup)**
-  - `[ ]` Implement React Context store in `src/lib/store/store.ts`
-  - `[ ]` Create `public/manifest.json` and `public/sw.js` PWA definitions
-  - `[ ]` Build layout wrappers and `Sidebar` switcher
+- `[x]` **Phase 4: Core State & App Layout (PWA Setup)**
+  - `[x]` Implement React Context store in `src/lib/store/store.ts` (created as store.tsx)
+  - `[x]` Create `public/manifest.json` and `public/sw.js` PWA definitions
+  - `[x]` Build layout wrappers and `Sidebar` switcher
 - `[ ]` **Phase 5: Interactive UI Components (Tailwind v4)**
   - `[ ]` Build unified list `EmailList.tsx` with scroll & swipe styles
   - `[ ]` Build detail pane `EmailDetail.tsx` with summary cards & smart reply hooks
