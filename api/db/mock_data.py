@@ -279,8 +279,8 @@ class MockDatabase:
                 e for e in filtered
                 if q_lower in e.subject.lower()
                 or q_lower in e.body.lower()
-                or q_lower in e.fromEmail.lower()
-                or q_lower in e.fromName.lower()
+                or q_lower in e.from_email.lower()
+                or q_lower in e.from_name.lower()
             ]
             
         # Sort by date descending

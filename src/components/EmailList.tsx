@@ -1,10 +1,15 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useEmailStore, Email } from "@/lib/store/store";
-import { Search, Sparkles, AlertCircle, CheckCircle2, Archive, Trash2, ArrowRight } from "lucide-react";
+import { Search, Sparkles, AlertCircle, CheckCircle2, Archive, Trash2, ArrowRight, RefreshCw, ChevronLeft } from "lucide-react";
 
-export default function EmailList() {
+interface EmailListProps {
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+}
+
+export default function EmailList({ isCollapsed, onToggleCollapse }: EmailListProps) {
   const {
     emails,
     activeEmailId,
@@ -15,8 +20,34 @@ export default function EmailList() {
     setActiveEmailId,
     setSearchQuery,
     moveToFolder,
-    toggleReadStatus
+    toggleReadStatus,
+    syncEmails,
+    activeAccountId
   } = useEmailStore();
+
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
+
+  const handleSync = async () => {
+    if (activeAccountId === "all") return;
+    setIsSyncing(true);
+    setSyncStatus(null);
+    try {
+      const res = await syncEmails(activeAccountId);
+      if (res.success) {
+        setSyncStatus(`Synced ${res.count} new!`);
+        setTimeout(() => setSyncStatus(null), 4000);
+      } else {
+        setSyncStatus(res.error || "Sync failed");
+        setTimeout(() => setSyncStatus(null), 4000);
+      }
+    } catch {
+      setSyncStatus("Network error");
+      setTimeout(() => setSyncStatus(null), 4000);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Filter emails by priority if priorityFocus is active
   const filteredEmails = useMemo(() => {
@@ -52,7 +83,9 @@ export default function EmailList() {
   };
 
   return (
-    <div className="w-full md:w-96 flex flex-col h-full bg-zinc-950 border-r border-zinc-900 shrink-0">
+    <aside className={`bg-zinc-950 flex flex-col h-full shrink-0 transition-all duration-300 ease-in-out ${
+      isCollapsed ? "w-0 border-r-0 opacity-0 pointer-events-none" : "w-full md:w-96 border-r border-zinc-900"
+    }`}>
       {/* Search Header */}
       <div className="p-4 border-b border-zinc-900 bg-zinc-950/50">
         <div className="relative">
@@ -68,13 +101,42 @@ export default function EmailList() {
       </div>
 
       {/* Feed Filter Info */}
-      <div className="px-4 py-3 flex items-center justify-between border-b border-zinc-900/50 bg-zinc-950/20">
+      <div className="px-4 py-2 flex items-center justify-between border-b border-zinc-900/50 bg-zinc-950/20">
         <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
           {priorityFocus ? "Priority Focus" : activeFolder}
         </span>
-        <span className="text-xxs font-bold px-2 py-0.5 rounded-full bg-zinc-900 text-zinc-400">
-          {filteredEmails.length} messages
-        </span>
+        <div className="flex items-center gap-2">
+          {syncStatus && (
+            <span className="text-[10px] font-bold text-indigo-400 animate-pulse bg-indigo-500/10 border border-indigo-500/10 px-2 py-0.5 rounded-full">
+              {syncStatus}
+            </span>
+          )}
+          {activeAccountId !== "all" && (
+            <button
+              onClick={handleSync}
+              disabled={isSyncing}
+              className={`p-1.5 rounded-lg border text-zinc-400 hover:text-zinc-200 transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
+                isSyncing 
+                  ? "bg-zinc-900 border-zinc-800" 
+                  : "bg-zinc-950/40 border-zinc-850 hover:border-zinc-800"
+              }`}
+              title="Sync Account"
+            >
+              <RefreshCw className={`w-3 h-3 ${isSyncing ? "animate-spin text-indigo-400" : ""}`} />
+              <span className="text-[10px] font-bold">Sync</span>
+            </button>
+          )}
+          <button
+            onClick={onToggleCollapse}
+            className="p-1.5 rounded-lg border bg-zinc-950/40 border-zinc-850 hover:border-zinc-800 text-zinc-400 hover:text-zinc-200 transition-all cursor-pointer flex items-center justify-center shrink-0"
+            title="Collapse Feed"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </button>
+          <span className="text-xxs font-bold px-2 py-1 rounded-lg bg-zinc-900 text-zinc-400 shrink-0">
+            {filteredEmails.length} messages
+          </span>
+        </div>
       </div>
 
       {/* Email Feed Items */}
@@ -182,6 +244,6 @@ export default function EmailList() {
           })
         )}
       </div>
-    </div>
+    </aside>
   );
 }

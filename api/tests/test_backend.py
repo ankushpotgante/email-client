@@ -89,3 +89,25 @@ def test_ai_draft_reply():
     data = response.json()
     assert "body" in data
     assert "3:00 PM" in data["body"] or "Alex" in data["body"]
+
+def test_create_demo_account():
+    response = client.post(
+        "/api/emails/accounts",
+        json={"id": "demo-acc-1", "name": "Demo Account", "type": "gmail", "email": "demo@domain.com"}
+    )
+    assert response.status_code == 200
+    assert response.json()["id"] == "demo-acc-1"
+    
+    # Check that welcome email was created for demo account
+    response = client.get("/api/emails?account=demo-acc-1")
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+    assert "Welcome" in response.json()[0]["subject"]
+
+def test_create_real_account_invalid_credentials():
+    response = client.post(
+        "/api/emails/accounts",
+        json={"id": "real-acc-1", "name": "Real Account", "type": "gmail", "email": "real@gmail.com", "password": "wrong_password"}
+    )
+    assert response.status_code == 400
+    assert "verification failed" in response.json()["detail"].lower()

@@ -55,7 +55,8 @@ interface EmailContextType {
   getAISummary: (emailId: string) => Promise<string>;
   triggerAITriage: (emailId: string) => Promise<void>;
   generateAIDraft: (emailId: string, prompt: string, tone: string) => Promise<string>;
-  addAccount: (name: string, email: string, type: string) => Promise<boolean>;
+  addAccount: (name: string, email: string, type: string, password?: string) => Promise<boolean>;
+  syncEmails: (accountId: string) => Promise<{ success: boolean; count: number; error?: string }>;
 }
 
 const EmailContext = createContext<EmailContextType | undefined>(undefined);
@@ -260,13 +261,13 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const addAccount = async (name: string, email: string, type: string): Promise<boolean> => {
+  const addAccount = async (name: string, email: string, type: string, password?: string): Promise<boolean> => {
     try {
       const id = `${type}-${name.toLowerCase().replace(/[^a-z0-9]/g, "-")}-${Math.floor(Math.random() * 1000)}`;
       const res = await fetch(`${API_BASE}/emails/accounts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, name, type, email })
+        body: JSON.stringify({ id, name, type, email, password })
       });
       if (res.ok) {
         await fetchAccounts();
@@ -277,6 +278,25 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (e) {
       console.error("Failed to add account:", e);
       return false;
+    }
+  };
+
+  const syncEmails = async (accountId: string): Promise<{ success: boolean; count: number; error?: string }> => {
+    try {
+      const res = await fetch(`${API_BASE}/emails/${accountId}/sync`, {
+        method: "POST"
+      });
+      if (res.ok) {
+        const data = await res.json();
+        await fetchEmails();
+        return { success: true, count: data.synced || 0 };
+      } else {
+        const errData = await res.json();
+        return { success: false, count: 0, error: errData.detail || "Sync failed" };
+      }
+    } catch (e) {
+      console.error("Failed to sync emails:", e);
+      return { success: false, count: 0, error: "Connection error" };
     }
   };
 
@@ -308,7 +328,8 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         getAISummary,
         triggerAITriage,
         generateAIDraft,
-        addAccount
+        addAccount,
+        syncEmails
       }}
     >
       {children}

@@ -15,11 +15,17 @@ import {
   CornerUpRight, 
   ChevronRight, 
   ArrowRight,
-  AlertCircle
+  AlertCircle,
+  Inbox
 } from "lucide-react";
 import canvasConfetti from "canvas-confetti";
 
-export default function EmailDetail() {
+interface EmailDetailProps {
+  isEmailListCollapsed: boolean;
+  onToggleEmailList: () => void;
+}
+
+export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }: EmailDetailProps) {
   const {
     activeEmailId,
     emails,
@@ -51,12 +57,26 @@ export default function EmailDetail() {
 
   if (!email) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-12 text-zinc-500 bg-zinc-950/40 text-center select-none h-full">
-        <Mail className="w-12 h-12 text-zinc-800 mb-4 animate-bounce" />
-        <h3 className="text-zinc-300 font-bold text-sm">Select a message</h3>
-        <p className="text-xs text-zinc-500 mt-1 max-w-xs leading-relaxed">
-          Choose an email from your feed to view attachments, read conversations, or write OpenAI draft replies.
-        </p>
+      <div className="flex-1 flex flex-col h-full bg-zinc-950/40 relative min-w-0 overflow-hidden">
+        {isEmailListCollapsed && (
+          <div className="p-4 border-b border-zinc-900 bg-zinc-950/60 flex items-center justify-between w-full">
+            <button
+              onClick={onToggleEmailList}
+              className="p-1.5 px-3 rounded-lg border bg-indigo-500/10 border-indigo-500/20 text-indigo-400 hover:text-indigo-300 transition-all cursor-pointer flex items-center gap-2 shrink-0 animate-pulse text-xs font-bold"
+              title="Expand Email Feed"
+            >
+              <Inbox className="w-4 h-4" />
+              <span>Show Inbox Feed</span>
+            </button>
+          </div>
+        )}
+        <div className="flex-1 flex flex-col items-center justify-center p-12 text-zinc-500 text-center select-none">
+          <Mail className="w-12 h-12 text-zinc-805 mb-4 animate-bounce" />
+          <h3 className="text-zinc-300 font-bold text-sm">Select a message</h3>
+          <p className="text-xs text-zinc-500 mt-1 max-w-xs leading-relaxed">
+            Choose an email from your feed to view attachments, read conversations, or write OpenAI draft replies.
+          </p>
+        </div>
       </div>
     );
   }
@@ -109,10 +129,20 @@ export default function EmailDetail() {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-zinc-950/40 relative">
+    <div className="flex-1 flex flex-col h-full bg-zinc-950/40 relative min-w-0 overflow-hidden">
       {/* Top Toolbar Action Buttons */}
-      <div className="p-4 border-b border-zinc-900 bg-zinc-950/60 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="p-4 border-b border-zinc-900 bg-zinc-950/60 flex flex-col sm:flex-row gap-3 sm:items-center justify-between min-w-0 w-full">
+        <div className="flex items-center gap-2 min-w-0">
+          {isEmailListCollapsed && (
+            <button
+              onClick={onToggleEmailList}
+              className="p-1.5 px-3 rounded-lg border bg-indigo-500/10 border-indigo-500/20 text-indigo-400 hover:text-indigo-300 transition-all cursor-pointer flex items-center gap-2 shrink-0 animate-pulse mr-2 text-xs font-bold"
+              title="Expand Email Feed"
+            >
+              <Inbox className="w-3.5 h-3.5" />
+              <span>Show Feed</span>
+            </button>
+          )}
           <button
             onClick={() => moveToFolder([email.id], "archived")}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800/80 text-zinc-300 hover:text-white hover:bg-zinc-850 hover:border-zinc-700 transition-colors text-xs font-semibold"
@@ -227,8 +257,8 @@ export default function EmailDetail() {
 
         {/* Active Content Tabs */}
         {activeTab === "read" && (
-          <div className="bg-zinc-900/20 border border-zinc-900/60 rounded-2xl p-6 shadow-sm">
-            <div className="prose prose-invert max-w-none text-sm text-zinc-300 whitespace-pre-line leading-relaxed">
+          <div className="bg-zinc-900/20 border border-zinc-900/60 rounded-2xl p-6 shadow-sm overflow-x-hidden w-full">
+            <div className="prose prose-invert max-w-none text-sm text-zinc-300 whitespace-pre-wrap break-words leading-relaxed w-full overflow-x-hidden">
               {email.body}
             </div>
           </div>

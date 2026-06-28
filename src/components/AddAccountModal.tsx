@@ -15,6 +15,7 @@ export default function AddAccountModal({ isOpen, onClose }: AddAccountModalProp
   const [email, setEmail] = useState("");
   const [type, setType] = useState("gmail");
   const [password, setPassword] = useState("");
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -28,7 +29,7 @@ export default function AddAccountModal({ isOpen, onClose }: AddAccountModalProp
     setError("");
 
     try {
-      const success = await addAccount(name, email, type);
+      const success = await addAccount(name, email, type, isOfflineMode ? undefined : password);
       if (success) {
         // Reset and close
         setName("");
@@ -137,25 +138,50 @@ export default function AddAccountModal({ isOpen, onClose }: AddAccountModalProp
             />
           </div>
 
-          {/* Password (App Password advice) */}
-          <div className="space-y-1.5">
-            <label className="text-xxs uppercase tracking-wider text-zinc-500 font-bold block">
-              App Password
-            </label>
-            <div className="relative">
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••••••••••"
-                className="w-full pl-4 pr-10 py-2.5 bg-zinc-950/40 border border-zinc-800 rounded-xl text-xs text-zinc-200 placeholder-zinc-700 focus:outline-none focus:border-indigo-500/50 transition-colors"
-              />
-              <Key className="absolute right-3.5 top-3 w-4 h-4 text-zinc-600 pointer-events-none" />
+          {/* Offline Mode Toggle */}
+          <div className="flex items-start gap-2.5 p-3 rounded-xl bg-zinc-950/20 border border-zinc-900">
+            <input
+              type="checkbox"
+              id="offlineMode"
+              checked={isOfflineMode}
+              onChange={(e) => {
+                setIsOfflineMode(e.target.checked);
+                if (e.target.checked) setPassword(""); // Clear password for demo
+              }}
+              className="mt-0.5 w-4 h-4 rounded border-zinc-800 bg-zinc-950 text-indigo-500 focus:ring-0 cursor-pointer"
+            />
+            <div className="space-y-0.5 select-none">
+              <label htmlFor="offlineMode" className="text-xs font-bold text-zinc-300 cursor-pointer">
+                Offline Demo Mode
+              </label>
+              <p className="text-[10px] text-zinc-500 leading-normal">
+                Bypass real connection check and load simulated emails to preview AI features immediately without generating keys/passwords.
+              </p>
             </div>
-            <p className="text-[10px] text-zinc-500 leading-normal">
-              For security, AuraMail runs locally. Connect Gmail or Office 365 using an **App Password** generated from your provider's security portal.
-            </p>
           </div>
+
+          {/* Password (App Password advice) */}
+          {!isOfflineMode && (
+            <div className="space-y-1.5 animate-in fade-in duration-200">
+              <label className="text-xxs uppercase tracking-wider text-zinc-500 font-bold block">
+                Account Password / App Password
+              </label>
+              <div className="relative">
+                <input
+                  type="password"
+                  required={!isOfflineMode}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••••••••••"
+                  className="w-full pl-4 pr-10 py-2.5 bg-zinc-950/40 border border-zinc-800 rounded-xl text-xs text-zinc-200 placeholder-zinc-700 focus:outline-none focus:border-indigo-500/50 transition-colors"
+                />
+                <Key className="absolute right-3.5 top-3 w-4 h-4 text-zinc-600 pointer-events-none" />
+              </div>
+              <p className="text-[10px] text-zinc-500 leading-normal">
+                AuraMail will login using whatever password you enter. **Custom IMAP servers** support your actual account password. **Gmail & Outlook** block actual passwords by default; you must use an **App Password** from your Google/Microsoft account settings.
+              </p>
+            </div>
+          )}
 
           {/* Submit */}
           <div className="pt-2">

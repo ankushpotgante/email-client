@@ -6,6 +6,7 @@ class Account(BaseModel):
     name: str
     type: str  # gmail, office365, imap
     email: str
+    password: Optional[str] = None
 
 class Email(BaseModel):
     id: str

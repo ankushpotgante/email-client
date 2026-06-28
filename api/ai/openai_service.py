@@ -5,8 +5,12 @@ from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 from openai import OpenAI
 
-# Load environment variables from .env file
-load_dotenv()
+from pathlib import Path
+
+# Load environment variables from project root .env file explicitly
+root_path = Path(__file__).resolve().parent.parent.parent
+env_path = root_path / ".env"
+load_dotenv(dotenv_path=env_path)
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
