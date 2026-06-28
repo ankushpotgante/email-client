@@ -15,6 +15,8 @@ export default function AddAccountModal({ isOpen, onClose }: AddAccountModalProp
   const [email, setEmail] = useState("");
   const [type, setType] = useState("gmail");
   const [password, setPassword] = useState("");
+  const [imapHost, setImapHost] = useState("");
+  const [imapPort, setImapPort] = useState("993");
   const [isOfflineMode, setIsOfflineMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -29,19 +31,28 @@ export default function AddAccountModal({ isOpen, onClose }: AddAccountModalProp
     setError("");
 
     try {
-      const success = await addAccount(name, email, type, isOfflineMode ? undefined : password);
+      const success = await addAccount(
+        name, 
+        email, 
+        type, 
+        isOfflineMode ? undefined : password,
+        type === "imap" ? imapHost : undefined,
+        type === "imap" ? Number(imapPort) : undefined
+      );
       if (success) {
         // Reset and close
         setName("");
         setEmail("");
         setType("gmail");
         setPassword("");
+        setImapHost("");
+        setImapPort("993");
         onClose();
       } else {
-        setError("Failed to add account. Make sure account ID is unique.");
+        setError("Failed to add account. Make sure credentials are correct.");
       }
-    } catch (err) {
-      setError("An unexpected error occurred.");
+    } catch (err: any) {
+      setError(err?.message || "An unexpected error occurred.");
     } finally {
       setIsSubmitting(false);
     }
@@ -137,6 +148,38 @@ export default function AddAccountModal({ isOpen, onClose }: AddAccountModalProp
               className="w-full px-4 py-2.5 bg-zinc-950/40 border border-zinc-800 rounded-xl text-xs text-zinc-200 placeholder-zinc-650 focus:outline-none focus:border-indigo-500/50 transition-colors"
             />
           </div>
+
+          {/* Custom IMAP Host and Port Settings */}
+          {type === "imap" && (
+            <div className="grid grid-cols-3 gap-3 p-3.5 rounded-xl bg-zinc-950/20 border border-zinc-800/60 animate-in fade-in duration-200">
+              <div className="col-span-2 space-y-1.5">
+                <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold block">
+                  IMAP Host
+                </label>
+                <input
+                  type="text"
+                  required={type === "imap"}
+                  value={imapHost}
+                  onChange={(e) => setImapHost(e.target.value)}
+                  placeholder="e.g. mail.domain.in"
+                  className="w-full px-3 py-2 bg-zinc-950/50 border border-zinc-800 rounded-lg text-xs text-zinc-200 placeholder-zinc-700 focus:outline-none focus:border-indigo-500/50 transition-colors"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold block">
+                  Port
+                </label>
+                <input
+                  type="text"
+                  required={type === "imap"}
+                  value={imapPort}
+                  onChange={(e) => setImapPort(e.target.value)}
+                  placeholder="993"
+                  className="w-full px-3 py-2 bg-zinc-950/50 border border-zinc-805 rounded-lg text-xs text-zinc-200 placeholder-zinc-700 focus:outline-none focus:border-indigo-500/50 transition-colors"
+                />
+              </div>
+            </div>
+          )}
 
           {/* Offline Mode Toggle */}
           <div className="flex items-start gap-2.5 p-3 rounded-xl bg-zinc-950/20 border border-zinc-900">

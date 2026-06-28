@@ -50,6 +50,8 @@ class Database:
                 type TEXT NOT NULL,
                 email TEXT NOT NULL,
                 password_encrypted TEXT,
+                imap_host TEXT,
+                imap_port INTEGER DEFAULT 993,
                 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
             )
         """)
@@ -77,6 +79,16 @@ class Database:
                 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
             )
         """)
+
+        # Schema migrations for existing database files
+        try:
+            cursor.execute("ALTER TABLE accounts ADD COLUMN imap_host TEXT")
+        except sqlite3.OperationalError:
+            pass # Column already exists
+        try:
+            cursor.execute("ALTER TABLE accounts ADD COLUMN imap_port INTEGER DEFAULT 993")
+        except sqlite3.OperationalError:
+            pass # Column already exists
 
         conn.commit()
         conn.close()
@@ -116,13 +128,13 @@ class Database:
 
     # ==================== Account Operations ====================
 
-    def add_account(self, account_id: str, user_id: str, name: str, type_name: str, email: str, password_encrypted: Optional[str]) -> bool:
+    def add_account(self, account_id: str, user_id: str, name: str, type_name: str, email: str, password_encrypted: Optional[str], imap_host: Optional[str] = None, imap_port: Optional[int] = 993) -> bool:
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO accounts (id, user_id, name, type, email, password_encrypted) VALUES (?, ?, ?, ?, ?, ?)",
-                (account_id, user_id, name, type_name, email, password_encrypted)
+                "INSERT INTO accounts (id, user_id, name, type, email, password_encrypted, imap_host, imap_port) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (account_id, user_id, name, type_name, email, password_encrypted, imap_host, imap_port)
             )
             conn.commit()
             conn.close()

@@ -69,7 +69,14 @@ interface EmailContextType {
   getAISummary: (emailId: string) => Promise<string>;
   triggerAITriage: (emailId: string) => Promise<void>;
   generateAIDraft: (emailId: string, prompt: string, tone: string) => Promise<string>;
-  addAccount: (name: string, email: string, type: string, password?: string) => Promise<boolean>;
+  addAccount: (
+    name: string, 
+    email: string, 
+    type: string, 
+    password?: string,
+    imapHost?: string,
+    imapPort?: number
+  ) => Promise<boolean>;
   syncEmails: (accountId: string) => Promise<{ success: boolean; count: number; error?: string }>;
 }
 
@@ -231,8 +238,8 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             let healedAny = false;
 
             for (const acc of localAccs) {
-              // If this cached account is NOT in the database accounts fetched from the backend, restore it!
-              const exists = data.some((a: any) => a.email === acc.email);
+              // Check if account exists by ID or case-insensitive email comparison
+              const exists = data.some((a: any) => a.id === acc.id || a.email.toLowerCase() === acc.email.toLowerCase());
               if (!exists) {
                 console.log(`Self-healing: Restoring account ${acc.email} in backend...`);
                 try {
@@ -244,7 +251,9 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                       name: acc.name,
                       type: acc.type,
                       email: acc.email,
-                      password: acc.password
+                      password: acc.password,
+                      imap_host: acc.imapHost || undefined,
+                      imap_port: acc.imapPort ? Number(acc.imapPort) : undefined
                     })
                   });
                   if (addRes.ok) {
@@ -494,14 +503,29 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const addAccount = async (name: string, email: string, type: string, password?: string): Promise<boolean> => {
+  const addAccount = async (
+    name: string, 
+    email: string, 
+    type: string, 
+    password?: string,
+    imapHost?: string,
+    imapPort?: number
+  ): Promise<boolean> => {
     if (!token) return false;
     try {
       const id = `${type}-${name.toLowerCase().replace(/[^a-z0-9]/g, "-")}-${Math.floor(Math.random() * 1000)}`;
       const res = await fetch(`${API_BASE}/emails/accounts`, {
         method: "POST",
         headers: getRequestHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ id, name, type, email, password })
+        body: JSON.stringify({ 
+          id, 
+          name, 
+          type, 
+          email, 
+          password,
+          imap_host: imapHost || undefined,
+          imap_port: imapPort ? Number(imapPort) : undefined
+        })
       });
       if (res.ok) {
         // Save to localStorage cache for self-healing session persistence
@@ -510,7 +534,7 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const localAccs = cached ? JSON.parse(cached) : [];
           // Avoid duplicate emails
           const filtered = localAccs.filter((a: any) => a.email !== email);
-          filtered.push({ id, name, type, email, password });
+          filtered.push({ id, name, type, email, password, imapHost, imapPort });
           localStorage.setItem("auramail_local_accounts", JSON.stringify(filtered));
         } catch (err) {
           console.error("Failed to cache account locally:", err);
@@ -527,7 +551,7 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const syncEmails = async (accountId: string): Promise<{ success: boolean; count: number; error?: string }> => {
+  const syncEmails = useCallback(async (accountId: string): Promise<{ success: boolean; count: number; error?: string }> => {
     if (!token) return { success: false, count: 0, error: "Unauthorized" };
     try {
       const res = await fetch(`${API_BASE}/emails/${accountId}/sync`, {
@@ -546,7 +570,7 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.error("Failed to sync emails:", e);
       return { success: false, count: 0, error: "Connection error" };
     }
-  };
+  }, [token, fetchEmails, getRequestHeaders]);
 
   return (
     <EmailContext.Provider

@@ -7,6 +7,8 @@ class Account(BaseModel):
     type: str  # gmail, office365, imap
     email: str
     password: Optional[str] = None
+    imap_host: Optional[str] = None
+    imap_port: Optional[int] = 993
 
 class Email(BaseModel):
     id: str
