@@ -90,7 +90,7 @@ export default function EmailList() {
             <h3 className="text-sm font-bold text-zinc-300">Inbox Zero achieved</h3>
             <p className="text-xs text-zinc-500 mt-1 max-w-xs leading-relaxed">
               {priorityFocus 
-                ? "No high-priority alerts flagged by Gemini at the moment."
+                ? "No high-priority alerts flagged by Smart AI at the moment."
                 : "You are all caught up! Keep that desk clean."}
             </p>
           </div>

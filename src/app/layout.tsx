@@ -17,7 +17,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "AuraMail | AI-First Universal Email Client",
-  description: "Premium universal email client powered by Gemini AI triage, summaries, and drafts.",
+  description: "Premium universal email client powered by Smart AI triage, summaries, and drafts.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
