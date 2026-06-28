@@ -175,23 +175,8 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setActiveFolder("inbox");
     localStorage.removeItem("auramail_token");
     localStorage.removeItem("auramail_user");
+    localStorage.removeItem("auramail_local_accounts");
   };
-
-  // Fetch all accounts
-  const fetchAccounts = useCallback(async () => {
-    if (!token) return;
-    try {
-      const res = await fetch(`${API_BASE}/emails/accounts`, {
-        headers: getRequestHeaders()
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setAccounts(data);
-      }
-    } catch (e) {
-      console.error("Failed to fetch accounts:", e);
-    }
-  }, [token, getRequestHeaders]);
 
   // Fetch emails matching active filters
   const fetchEmails = useCallback(async () => {
@@ -226,6 +211,75 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setIsLoadingEmails(false);
     }
   }, [token, activeAccountId, activeFolder, searchQuery, getRequestHeaders]);
+
+  // Fetch all accounts
+  const fetchAccounts = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE}/emails/accounts`, {
+        headers: getRequestHeaders()
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAccounts(data);
+
+        // Self-healing database restoration for serverless runtimes
+        if (typeof window !== "undefined") {
+          const cached = localStorage.getItem("auramail_local_accounts");
+          if (cached) {
+            const localAccs = JSON.parse(cached);
+            let healedAny = false;
+
+            for (const acc of localAccs) {
+              // If this cached account is NOT in the database accounts fetched from the backend, restore it!
+              const exists = data.some((a: any) => a.email === acc.email);
+              if (!exists) {
+                console.log(`Self-healing: Restoring account ${acc.email} in backend...`);
+                try {
+                  const addRes = await fetch(`${API_BASE}/emails/accounts`, {
+                    method: "POST",
+                    headers: getRequestHeaders({ "Content-Type": "application/json" }),
+                    body: JSON.stringify({
+                      id: acc.id,
+                      name: acc.name,
+                      type: acc.type,
+                      email: acc.email,
+                      password: acc.password
+                    })
+                  });
+                  if (addRes.ok) {
+                    healedAny = true;
+                    // Trigger sync in background
+                    fetch(`${API_BASE}/emails/${acc.id}/sync`, {
+                      method: "POST",
+                      headers: getRequestHeaders()
+                    }).catch(err => console.error("Self-healing background sync failed:", err));
+                  }
+                } catch (addErr) {
+                  console.error(`Self-healing restoration failed for ${acc.email}:`, addErr);
+                }
+              }
+            }
+
+            if (healedAny) {
+              // Refetch accounts to reflect restored accounts in UI
+              const freshRes = await fetch(`${API_BASE}/emails/accounts`, {
+                headers: getRequestHeaders()
+              });
+              if (freshRes.ok) {
+                const freshData = await freshRes.json();
+                setAccounts(freshData);
+                // Trigger reload of emails
+                fetchEmails();
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch accounts:", e);
+    }
+  }, [token, getRequestHeaders, fetchEmails]);
 
   // Load more emails (pagination)
   const loadMoreEmails = useCallback(async () => {
@@ -450,6 +504,18 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         body: JSON.stringify({ id, name, type, email, password })
       });
       if (res.ok) {
+        // Save to localStorage cache for self-healing session persistence
+        try {
+          const cached = localStorage.getItem("auramail_local_accounts");
+          const localAccs = cached ? JSON.parse(cached) : [];
+          // Avoid duplicate emails
+          const filtered = localAccs.filter((a: any) => a.email !== email);
+          filtered.push({ id, name, type, email, password });
+          localStorage.setItem("auramail_local_accounts", JSON.stringify(filtered));
+        } catch (err) {
+          console.error("Failed to cache account locally:", err);
+        }
+
         await fetchAccounts();
         setActiveAccountId(id);
         return true;
