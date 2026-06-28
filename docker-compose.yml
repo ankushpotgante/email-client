@@ -1,0 +1,39 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend.Dockerfile
+    container_name: auramail-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    volumes:
+      - ./api:/app/api
+    networks:
+      - auramail-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend.Dockerfile
+    container_name: auramail-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - BACKEND_URL=http://backend:8000
+    volumes:
+      - ./src:/app/src
+      - ./public:/app/public
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - auramail-network
+
+networks:
+  auramail-network:
+    name: auramail-network
+    driver: bridge

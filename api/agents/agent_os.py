@@ -1,7 +1,7 @@
 import json
 import logging
 from typing import Dict, List, Any, Callable, Optional
-from api.ai.gemini import call_gemini
+from api.ai.openai_service import call_openai
 
 logger = logging.getLogger("AgentOS")
 
@@ -42,8 +42,8 @@ class Agent:
         skills_description = "\n".join([f"- Skill '{s.name}': {s.description}" for s in self.skills.values()])
         full_system_prompt = f"{self.system_prompt}\n\nYou have access to the following skills:\n{skills_description}" if self.skills else self.system_prompt
         
-        # Call the Gemini skill (or direct execution)
-        return call_gemini(full_system_prompt, user_prompt, json_mode)
+        # Call the OpenAI skill (or direct execution)
+        return call_openai(full_system_prompt, user_prompt, json_mode)
 
 class AgentOSRegistry:
     """
@@ -86,16 +86,16 @@ agent_os = AgentOSRegistry()
 
 # ----------------- Define Core Skills -----------------
 
-def skill_gemini_call(prompt: str, system: str, json_mode: bool = False) -> str:
-    return call_gemini(system, prompt, json_mode)
+def skill_openai_call(prompt: str, system: str, json_mode: bool = False) -> str:
+    return call_openai(system, prompt, json_mode)
 
-gemini_skill = Skill(
-    name="call_gemini",
-    description="Invokes the Gemini Large Language Model to perform text generation, synthesis, or extraction.",
-    func=skill_gemini_call
+openai_skill = Skill(
+    name="call_openai",
+    description="Invokes the OpenAI Large Language Model (gpt-4o-mini) to perform text generation, synthesis, or extraction.",
+    func=skill_openai_call
 )
 
-agent_os.register_skill(gemini_skill)
+agent_os.register_skill(openai_skill)
 
 
 # ----------------- Define Core Agents -----------------
@@ -118,7 +118,7 @@ triage_agent = Agent(
     role="Email Triage & Inbox Sorting",
     system_prompt=triage_system_prompt
 )
-triage_agent.bind_skill(gemini_skill)
+triage_agent.bind_skill(openai_skill)
 agent_os.register_agent(triage_agent)
 
 
@@ -135,7 +135,7 @@ summary_agent = Agent(
     role="Email Summarization & Synthesis",
     system_prompt=summary_system_prompt
 )
-summary_agent.bind_skill(gemini_skill)
+summary_agent.bind_skill(openai_skill)
 agent_os.register_agent(summary_agent)
 
 
@@ -157,7 +157,7 @@ drafting_agent = Agent(
     role="Contextual Draft Generator",
     system_prompt=drafting_system_prompt
 )
-drafting_agent.bind_skill(gemini_skill)
+drafting_agent.bind_skill(openai_skill)
 agent_os.register_agent(drafting_agent)
 
 

@@ -2,52 +2,55 @@ import os
 import json
 import logging
 from typing import Dict, Any, Optional
-import google.generativeai as genai
+from dotenv import load_dotenv
+from openai import OpenAI
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("GeminiAI")
+logger = logging.getLogger("OpenAIService")
 
 # Read API Key
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
-if GEMINI_API_KEY:
+if OPENAI_API_KEY:
     try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        # Use gemini-1.5-flash for fast and cost-effective operations
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        logger.info("Gemini AI successfully initialized with API Key.")
-        HAS_GEMINI = True
+        # Initialize OpenAI client
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        logger.info("OpenAI API successfully initialized.")
+        HAS_OPENAI = True
     except Exception as e:
-        logger.error(f"Failed to configure Gemini SDK: {e}. Falling back to Simulation Mode.")
-        HAS_GEMINI = False
+        logger.error(f"Failed to initialize OpenAI client: {e}. Running in Simulation Mode.")
+        HAS_OPENAI = False
 else:
-    logger.info("No GEMINI_API_KEY found in environment. Running in Demo/Simulation Mode.")
-    HAS_GEMINI = False
+    logger.info("No OPENAI_API_KEY found in env or .env file. Running in Simulation/Demo Mode.")
+    HAS_OPENAI = False
 
 
-def call_gemini(system_prompt: str, user_prompt: str, json_mode: bool = False) -> str:
+def call_openai(system_prompt: str, user_prompt: str, json_mode: bool = False) -> str:
     """
-    Executes a query to the Gemini model with a system prompt.
-    Falls back to mock answers if Gemini API is not configured.
+    Executes a query to the OpenAI chat completions model (gpt-4o-mini).
+    Falls back to mock answers if key is missing or call fails.
     """
-    if not HAS_GEMINI:
+    if not HAS_OPENAI:
         return get_mock_ai_response(system_prompt, user_prompt, json_mode)
     
     try:
-        # We can pass system instructions and user instructions
-        # In python google-generativeai, GenerativeModel takes system_instruction at construction
-        # Or we can combine system prompt and user prompt
-        combined_model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
-            system_instruction=system_prompt,
-            generation_config={"response_mime_type": "application/json"} if json_mode else None
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            response_format={"type": "json_object"} if json_mode else None,
+            timeout=10.0 # set timeout to prevent hangs
         )
-        
-        response = combined_model.generate_content(user_prompt)
-        return response.text.strip()
+        return response.choices[0].message.content.strip()
     except Exception as e:
-        logger.error(f"Gemini API invocation failed: {e}. Falling back to simulation output.")
+        # Proper error handling: log error and fallback to mock responses so main functionality continues
+        logger.error(f"OpenAI API call failed: {e}. Falling back to Simulation Mode.")
         return get_mock_ai_response(system_prompt, user_prompt, json_mode)
 
 
@@ -59,7 +62,6 @@ def get_mock_ai_response(system_prompt: str, user_prompt: str, json_mode: bool) 
     
     # Check if this is a Triaging request
     if "priority" in system_prompt.lower() or "triage" in system_prompt.lower():
-        # Look for keywords in the email details to give an smart priority classification
         priority = "medium"
         reason = "A standard message requiring review during normal business hours."
         
@@ -79,7 +81,6 @@ def get_mock_ai_response(system_prompt: str, user_prompt: str, json_mode: bool) 
         
     # Check if this is a Summarization request
     elif "summarize" in system_prompt.lower() or "summary" in system_prompt.lower():
-        # Match common items in mock data or construct general summary
         if "term sheet" in user_prompt_lower:
             summary = "- Sarah Jenkins from Ventures VC sent the finalized Seed Term Sheet for AuraMail.\n- Requests review and a conference call today at 3:00 PM EST.\n- Warns the term sheet has a 24-hour expiration clause."
         elif "database cpu" in user_prompt_lower:
@@ -97,7 +98,6 @@ def get_mock_ai_response(system_prompt: str, user_prompt: str, json_mode: bool) 
 
     # Check if this is a Drafting request
     elif "draft" in system_prompt.lower() or "reply" in system_prompt.lower():
-        # Parse the requested tone
         tone = "professional"
         if "casual" in user_prompt_lower:
             tone = "casual"
@@ -126,7 +126,6 @@ def get_mock_ai_response(system_prompt: str, user_prompt: str, json_mode: bool) 
             else:
                 return "Hello,\n\nThank you for reaching out. I have received your email and am currently looking into the details. I will follow up with you as soon as I have a formal update.\n\nBest regards,\nAlex Rivers"
             
-    # Default fallback
     if json_mode:
         return json.dumps({"text": "AuraMail AI Response"})
     return "AuraMail AI Response"

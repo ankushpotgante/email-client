@@ -28,10 +28,10 @@
   - `[x]` Build detail pane `EmailDetail.tsx` with summary cards & smart reply hooks
   - `[x]` Build compose modal `ComposeModal.tsx`
   - `[x]` UI Polish & transitions (Outfit font, animations, inbox zero confetti)
-- `[ ]` **Phase 6: Testing, Polish & Documentation**
-  - `[ ]` Write backend unit tests in `api/tests/` and verify with Pytest
-  - `[ ]` Write frontend tests for stores & page actions
-  - `[ ]` Generate `GEMINI.md` CLI playbook
-  - `[ ]` Generate `architecture.md`
-  - `[ ]` Generate `agents_workflow.md`
-  - `[ ]` Build verification and final deployment sanity checks
+- `[x]` **Phase 6: Testing, Polish & Documentation**
+  - `[x]` Write backend unit tests in `api/tests/` and verify with Pytest
+  - `[x]` Write frontend tests for stores & page actions
+  - `[x]` Generate `GEMINI.md` CLI playbook
+  - `[x]` Generate `architecture.md`
+  - `[x]` Generate `agents_workflow.md`
+  - `[x]` Build verification and final deployment sanity checks
