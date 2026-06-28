@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useEmailStore } from "@/lib/store/store";
+import AddAccountModal from "@/components/AddAccountModal";
 import { 
   Mail, 
   Archive, 
@@ -31,6 +32,7 @@ export default function Sidebar() {
   } = useEmailStore();
 
   const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false);
+  const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
 
   // Find active account details
   const activeAccount = accounts.find((a) => a.id === activeAccountId);
@@ -73,7 +75,7 @@ export default function Sidebar() {
           <h1 className="text-lg font-bold bg-gradient-to-r from-zinc-50 via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
             AuraMail
           </h1>
-          <span className="text-xs text-zinc-500 font-medium">Gemini AI Client</span>
+          <span className="text-xs text-zinc-500 font-medium">OpenAI Client</span>
         </div>
       </div>
 
@@ -149,6 +151,18 @@ export default function Sidebar() {
                   </button>
                 ))}
               </div>
+              <div className="p-1.5 border-t border-zinc-800/50 bg-zinc-950/20">
+                <button
+                  onClick={() => {
+                    setIsAddAccountOpen(true);
+                    setIsAccountDropdownOpen(false);
+                  }}
+                  className="w-full flex items-center gap-3 p-2 rounded-lg text-xs font-semibold text-indigo-400 hover:bg-indigo-500/10 hover:text-indigo-300 transition-colors text-left cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Connect Account</span>
+                </button>
+              </div>
             </div>
           </>
         )}
@@ -222,7 +236,7 @@ export default function Sidebar() {
             <div className={`w-2 h-2 rounded-full ${priorityFocus ? "bg-amber-400 animate-pulse shadow-md shadow-amber-400/50" : "bg-zinc-600"}`} />
             <div>
               <div className="text-xs font-semibold text-zinc-200">Priority Focus</div>
-              <div className="text-xxs text-zinc-500">Gemini Triage Only</div>
+              <div className="text-xxs text-zinc-500">OpenAI Triage Only</div>
             </div>
           </div>
           <button
@@ -239,6 +253,12 @@ export default function Sidebar() {
           </button>
         </div>
       </div>
+
+      {/* Add Account Modal */}
+      <AddAccountModal 
+        isOpen={isAddAccountOpen} 
+        onClose={() => setIsAddAccountOpen(false)} 
+      />
     </aside>
   );
 }

@@ -34,6 +34,7 @@ AuraMail is successfully built as a high-fidelity, premium, and responsive Progr
   - `EmailList.tsx`: Feeds lists with scroll panels, subject previews, one-line AI summaries, and quick-hover Archive/Delete actions.
   - `EmailDetail.tsx`: Reading pane containing action bars, collapsible AI bulleted summary cards, and quick reply tone drafting widgets.
   - `ComposeModal.tsx`: Text input modal linked directly with reading pane drafts.
+  - `AddAccountModal.tsx`: Dynamic connection modal allowing users to register new accounts (Gmail, Office 365, IMAP) with welcome mail populations.
 
 ---
 

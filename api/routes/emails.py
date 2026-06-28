@@ -11,6 +11,39 @@ router = APIRouter(prefix="/emails", tags=["Emails"])
 def get_accounts():
     return db.get_accounts()
 
+@router.post("/accounts", response_model=Account)
+def create_account(account: Account):
+    # Verify unique ID
+    for existing in db.get_accounts():
+        if existing.id == account.id:
+            raise HTTPException(status_code=400, detail="Account ID already exists")
+            
+    db.accounts.append(account)
+    
+    # Generate initial welcome email for this account
+    welcome_id = f"welcome-{account.id}"
+    iso_date = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    
+    welcome_email = Email(
+        id=welcome_id,
+        accountId=account.id,
+        fromEmail="team@auramail.ai",
+        fromName="AuraMail Team",
+        toEmail=account.email,
+        subject=f"Welcome to AuraMail, {account.name}!",
+        body=f"Hi {account.name},\n\nWelcome to your new {account.type.upper()} email inbox on AuraMail!\n\nThis client integrates OpenAI agents to summarize threads, suggest quick replies, and prioritize incoming messages. We are thrilled to have you here.\n\nBest regards,\nThe AuraMail Team",
+        date=iso_date,
+        folder="inbox",
+        labels=["System", "Welcome"],
+        read=False,
+        priority="high",
+        priorityReason="Welcome message from AuraMail outlining core account activation details.",
+        summary="A welcome email introducing the new AuraMail user to their integrated AI-first inbox features."
+    )
+    db.add_email(welcome_email)
+    
+    return account
+
 @router.get("", response_model=List[Email])
 def get_emails(
     account: Optional[str] = Query(None, description="Account ID or 'all'"),

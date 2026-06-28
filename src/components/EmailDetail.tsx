@@ -55,7 +55,7 @@ export default function EmailDetail() {
         <Mail className="w-12 h-12 text-zinc-800 mb-4 animate-bounce" />
         <h3 className="text-zinc-300 font-bold text-sm">Select a message</h3>
         <p className="text-xs text-zinc-500 mt-1 max-w-xs leading-relaxed">
-          Choose an email from your feed to view attachments, read conversations, or write Gemini draft replies.
+          Choose an email from your feed to view attachments, read conversations, or write OpenAI draft replies.
         </p>
       </div>
     );
@@ -70,7 +70,7 @@ export default function EmailDetail() {
     }
   };
 
-  // Generate Reply Draft using Gemini
+  // Generate Reply Draft using OpenAI
   const handleGenerateDraft = async (promptOverride?: string) => {
     setIsDrafting(true);
     setActiveTab("reply");
@@ -219,7 +219,7 @@ export default function EmailDetail() {
           <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/10 flex items-start gap-3 shadow shadow-amber-500/2">
             <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider">Gemini Triage Insight</h4>
+              <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider">OpenAI Triage Insight</h4>
               <p className="text-xs text-zinc-400 leading-relaxed mt-1">{email.priorityReason}</p>
             </div>
           </div>
@@ -297,7 +297,7 @@ export default function EmailDetail() {
                   type="text"
                   value={customPrompt}
                   onChange={(e) => setCustomPrompt(e.target.value)}
-                  placeholder="Tell Gemini what you want to write..."
+                  placeholder="Tell OpenAI what you want to write..."
                   className="flex-1 px-4 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500/50"
                 />
                 <button
@@ -316,7 +316,7 @@ export default function EmailDetail() {
                 <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
                   <span className="text-xs font-bold text-indigo-400 flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span>Gemini Draft Output</span>
+                    <span>OpenAI Draft Output</span>
                   </span>
                   
                   {generatedDraft && !isDrafting && (

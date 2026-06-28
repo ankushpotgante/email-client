@@ -55,6 +55,7 @@ interface EmailContextType {
   getAISummary: (emailId: string) => Promise<string>;
   triggerAITriage: (emailId: string) => Promise<void>;
   generateAIDraft: (emailId: string, prompt: string, tone: string) => Promise<string>;
+  addAccount: (name: string, email: string, type: string) => Promise<boolean>;
 }
 
 const EmailContext = createContext<EmailContextType | undefined>(undefined);
@@ -259,6 +260,26 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  const addAccount = async (name: string, email: string, type: string): Promise<boolean> => {
+    try {
+      const id = `${type}-${name.toLowerCase().replace(/[^a-z0-9]/g, "-")}-${Math.floor(Math.random() * 1000)}`;
+      const res = await fetch(`${API_BASE}/emails/accounts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, name, type, email })
+      });
+      if (res.ok) {
+        await fetchAccounts();
+        setActiveAccountId(id);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.error("Failed to add account:", e);
+      return false;
+    }
+  };
+
   return (
     <EmailContext.Provider
       value={{
@@ -286,7 +307,8 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         sendEmail,
         getAISummary,
         triggerAITriage,
-        generateAIDraft
+        generateAIDraft,
+        addAccount
       }}
     >
       {children}
