@@ -21,6 +21,10 @@ def setup_test_db():
     db_instance.db_path = TEST_DB_PATH
     db_instance.init_db()
     
+    # Ensure dummy user (with seeded data) exists in the test database
+    from api.routes.auth import ensure_dummy_account
+    ensure_dummy_account()
+    
     yield
     
     # Reset path and clean up test file
@@ -38,6 +42,7 @@ def test_health_check():
     assert "supported_accounts" in response.json()
 
 def test_register_user():
+    """Test registering a new clean user (no seeded data by design)."""
     global auth_headers, test_user_id
     response = client.post(
         "/api/auth/register",
@@ -47,18 +52,20 @@ def test_register_user():
     data = response.json()
     assert "access_token" in data
     assert data["user"]["username"] == "testuser"
-    
     test_user_id = data["user"]["id"]
-    token = data["access_token"]
-    auth_headers = {"Authorization": f"Bearer {token}"}
 
-def test_login_user():
+def test_login_as_dummy():
+    """Login as dummy/dummy to get a token with seeded data for subsequent tests."""
+    global auth_headers
     response = client.post(
         "/api/auth/login",
-        json={"username": "testuser", "password": "password123"}
+        json={"username": "dummy", "password": "dummy"}
     )
     assert response.status_code == 200
-    assert "access_token" in response.json()
+    data = response.json()
+    assert "access_token" in data
+    token = data["access_token"]
+    auth_headers = {"Authorization": f"Bearer {token}"}
 
 def test_get_accounts():
     response = client.get("/api/emails/accounts", headers=auth_headers)
@@ -114,10 +121,10 @@ def test_move_folder():
     assert response.status_code == 200
     assert response.json()["success"] is True
     
-    # Verify DB state
-    db_email = db_instance.get_email_by_id(test_user_id, first_email_id)
-    assert db_email is not None
-    assert db_email["folder"] == "archived"
+    # Verify by fetching from API
+    detail = client.get(f"/api/emails/{first_email_id}", headers=auth_headers)
+    assert detail.status_code == 200
+    assert detail.json()["folder"] == "archived"
 
 def test_ai_prioritize():
     emails_list = client.get("/api/emails", headers=auth_headers).json()

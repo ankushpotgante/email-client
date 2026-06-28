@@ -58,6 +58,8 @@ interface EmailContextType {
   register: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   
+  hasMoreEmails: boolean;
+  loadMoreEmails: () => Promise<void>;
   fetchAccounts: () => Promise<void>;
   fetchEmails: () => Promise<void>;
   moveToFolder: (emailIds: string[], folder: string) => Promise<void>;
@@ -86,6 +88,9 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isLoadingEmails, setIsLoadingEmails] = useState<boolean>(false);
   const [isLoadingSummary, setIsLoadingSummary] = useState<boolean>(false);
   const [summaryCache, setSummaryCache] = useState<Record<string, string>>({});
+  const [emailPage, setEmailPage] = useState<number>(0);
+  const [hasMoreEmails, setHasMoreEmails] = useState<boolean>(false);
+  const PAGE_SIZE = 25;
 
   // Auth local states
   const [token, setToken] = useState<string | null>(null);
@@ -191,6 +196,7 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const fetchEmails = useCallback(async () => {
     if (!token) return;
     setIsLoadingEmails(true);
+    setEmailPage(0);
     try {
       const params = new URLSearchParams();
       if (activeAccountId && activeAccountId !== "all") {
@@ -202,6 +208,8 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (searchQuery) {
         params.append("q", searchQuery);
       }
+      params.append("limit", String(PAGE_SIZE));
+      params.append("offset", "0");
       
       const res = await fetch(`${API_BASE}/emails?${params.toString()}`, {
         headers: getRequestHeaders()
@@ -209,6 +217,7 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (res.ok) {
         const data = await res.json();
         setEmails(data);
+        setHasMoreEmails(data.length === PAGE_SIZE);
       }
     } catch (e) {
       console.error("Failed to fetch emails:", e);
@@ -216,6 +225,41 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setIsLoadingEmails(false);
     }
   }, [token, activeAccountId, activeFolder, searchQuery, getRequestHeaders]);
+
+  // Load more emails (pagination)
+  const loadMoreEmails = useCallback(async () => {
+    if (!token || isLoadingEmails) return;
+    const nextPage = emailPage + 1;
+    setIsLoadingEmails(true);
+    try {
+      const params = new URLSearchParams();
+      if (activeAccountId && activeAccountId !== "all") {
+        params.append("account", activeAccountId);
+      }
+      if (activeFolder) {
+        params.append("folder", activeFolder);
+      }
+      if (searchQuery) {
+        params.append("q", searchQuery);
+      }
+      params.append("limit", String(PAGE_SIZE));
+      params.append("offset", String(nextPage * PAGE_SIZE));
+      
+      const res = await fetch(`${API_BASE}/emails?${params.toString()}`, {
+        headers: getRequestHeaders()
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setEmails(prev => [...prev, ...data]);
+        setEmailPage(nextPage);
+        setHasMoreEmails(data.length === PAGE_SIZE);
+      }
+    } catch (e) {
+      console.error("Failed to load more emails:", e);
+    } finally {
+      setIsLoadingEmails(false);
+    }
+  }, [token, activeAccountId, activeFolder, searchQuery, emailPage, isLoadingEmails, getRequestHeaders]);
 
   // Load accounts initially
   useEffect(() => {
@@ -432,6 +476,7 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         token,
         user,
         isAuthLoading,
+        hasMoreEmails,
         setActiveAccountId,
         setActiveFolder,
         setActiveEmailId,
@@ -443,6 +488,7 @@ export const EmailProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         logout,
         fetchAccounts,
         fetchEmails,
+        loadMoreEmails,
         moveToFolder,
         toggleReadStatus,
         sendEmail,

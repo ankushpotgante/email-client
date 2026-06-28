@@ -22,7 +22,9 @@ export default function EmailList({ isCollapsed, onToggleCollapse }: EmailListPr
     moveToFolder,
     toggleReadStatus,
     syncEmails,
-    activeAccountId
+    activeAccountId,
+    hasMoreEmails,
+    loadMoreEmails
   } = useEmailStore();
 
   const [isSyncing, setIsSyncing] = useState(false);
@@ -242,6 +244,24 @@ export default function EmailList({ isCollapsed, onToggleCollapse }: EmailListPr
               </div>
             );
           })
+        )}
+
+        {/* Load More Pagination */}
+        {hasMoreEmails && !isLoadingEmails && (
+          <div className="p-4 flex justify-center border-t border-zinc-900/50">
+            <button
+              onClick={loadMoreEmails}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-indigo-500/30 hover:text-indigo-400 text-zinc-400 text-xs font-semibold transition-all cursor-pointer"
+            >
+              <ArrowRight className="w-3.5 h-3.5" />
+              Load More
+            </button>
+          </div>
+        )}
+        {isLoadingEmails && emails.length > 0 && (
+          <div className="p-4 flex justify-center">
+            <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          </div>
         )}
       </div>
     </aside>

@@ -9,7 +9,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 class AuthRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
-    password: str = Field(..., min_length=6, max_length=100)
+    password: str = Field(..., min_length=5, max_length=100)
 
 class AuthResponse(BaseModel):
     access_token: str
@@ -142,6 +142,24 @@ def seed_new_user_data(user_id: str):
         )
 
 
+def ensure_dummy_account():
+    """Creates a static dummy user seeded with demo data for new visitors."""
+    existing = db_instance.get_user_by_username("dummy")
+    if existing:
+        return  # Already exists
+    
+    dummy_id = "dummy-user-00000000"
+    pw_hash = hash_password("dummy")
+    created_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    
+    success = db_instance.create_user(dummy_id, "dummy", pw_hash, created_at)
+    if success:
+        try:
+            seed_new_user_data(dummy_id)
+        except Exception as e:
+            pass
+
+
 # ==================== Auth Endpoints ====================
 
 @router.post("/register", response_model=AuthResponse)
@@ -159,13 +177,6 @@ def register(req: AuthRequest):
     success = db_instance.create_user(user_id, req.username, pw_hash, created_at)
     if not success:
         raise HTTPException(status_code=500, detail="Failed to create user.")
-
-    # Seed data
-    try:
-        seed_new_user_data(user_id)
-    except Exception as e:
-        # Don't block registration if seeding fails
-        pass
 
     # Create token
     token = create_access_token(user_id)

@@ -168,7 +168,7 @@ class Database:
             logger.error(f"Failed to add email: {e}")
             return False
 
-    def get_emails(self, user_id: str, account_id: Optional[str] = None, folder: Optional[str] = None, q: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_emails(self, user_id: str, account_id: Optional[str] = None, folder: Optional[str] = None, q: Optional[str] = None, limit: int = 25, offset: int = 0) -> List[Dict[str, Any]]:
         conn = self.get_connection()
         cursor = conn.cursor()
 
@@ -188,7 +188,8 @@ class Database:
             query += " AND (LOWER(subject) LIKE ? OR LOWER(body) LIKE ? OR LOWER(from_email) LIKE ? OR LOWER(from_name) LIKE ?)"
             params.extend([q_lower, q_lower, q_lower, q_lower])
 
-        query += " ORDER BY date DESC"
+        query += " ORDER BY date DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
 
         cursor.execute(query, params)
         rows = cursor.fetchall()

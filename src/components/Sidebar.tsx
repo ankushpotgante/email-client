@@ -35,11 +35,13 @@ export default function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps)
     setActiveFolder,
     setPriorityFocus,
     setIsComposeOpen,
+    user,
     logout
   } = useEmailStore();
 
   const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false);
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   // Find active account details
   const activeAccount = accounts.find((a) => a.id === activeAccountId);
@@ -82,7 +84,7 @@ export default function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps)
             </div>
             <div className="truncate">
               <h1 className="text-sm font-bold text-zinc-150 leading-tight">AuraMail</h1>
-              <span className="text-[10px] text-zinc-500 font-semibold">OpenAI Client</span>
+              <span className="text-[10px] text-zinc-500 font-semibold">AI Client</span>
             </div>
           </div>
         ) : (
@@ -100,6 +102,50 @@ export default function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps)
           {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </button>
       </div>
+
+      {/* User Profile Dropdown (top-right when expanded) */}
+      {!isCollapsed && (
+        <div className="px-4 pb-3 pt-1 border-b border-zinc-900/50 relative">
+          <button
+            onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-zinc-900/30 hover:bg-zinc-900 border border-zinc-800/60 hover:border-zinc-700 transition-all text-left cursor-pointer group"
+          >
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-indigo-500/30 to-purple-500/30 border border-indigo-500/20 flex items-center justify-center shrink-0">
+              <User className="w-3.5 h-3.5 text-indigo-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-semibold text-zinc-200 truncate">{user?.username || "Guest"}</div>
+              <div className="text-[10px] text-zinc-500">Signed in</div>
+            </div>
+            <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 group-hover:text-zinc-300 transition-all shrink-0 ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {isUserMenuOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setIsUserMenuOpen(false)} />
+              <div className="absolute left-4 right-4 top-full mt-1 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-20 animate-in fade-in slide-in-from-top-1 duration-100">
+                <div className="p-2">
+                  <div className="px-2 py-1.5 text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">
+                    Signed in as <span className="text-zinc-300">{user?.username}</span>
+                  </div>
+                </div>
+                <div className="p-1.5 border-t border-zinc-800">
+                  <button
+                    onClick={() => {
+                      logout();
+                      setIsUserMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 p-2.5 rounded-lg text-xs font-semibold text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-colors text-left cursor-pointer"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Account Switcher */}
       <div className={`px-4 mb-4 relative mt-4 ${isCollapsed ? "flex justify-center" : ""}`}>
@@ -187,7 +233,7 @@ export default function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps)
                   </button>
                 ))}
               </div>
-              <div className="p-1.5 border-t border-zinc-800/50 bg-zinc-950/20 flex flex-col gap-1">
+              <div className="p-1.5 border-t border-zinc-800/50 bg-zinc-950/20">
                 <button
                   onClick={() => {
                     setIsAddAccountOpen(true);
@@ -197,16 +243,6 @@ export default function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps)
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Connect Account</span>
-                </button>
-                <button
-                  onClick={() => {
-                    logout();
-                    setIsAccountDropdownOpen(false);
-                  }}
-                  className="w-full flex items-center gap-2.5 p-2 rounded-lg text-[10px] font-bold text-rose-450 hover:bg-rose-500/10 hover:text-rose-400 transition-colors text-left cursor-pointer"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>Sign Out</span>
                 </button>
               </div>
             </div>

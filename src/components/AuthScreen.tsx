@@ -18,8 +18,8 @@ export default function AuthScreen() {
       setError("Please fill in all fields.");
       return;
     }
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters long.");
+    if (password.length < 5) {
+      setError("Password must be at least 5 characters long.");
       return;
     }
 
@@ -144,6 +144,23 @@ export default function AuthScreen() {
             disabled={isSubmitting}
           >
             {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
+          </button>
+        </div>
+
+        {/* Demo Account Banner */}
+        <div className="mt-5 p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/15">
+          <p className="text-[10px] text-zinc-500 text-center mb-2 font-semibold uppercase tracking-wider">Try Demo Account</p>
+          <button
+            type="button"
+            onClick={() => {
+              setUsername("dummy");
+              setPassword("dummy");
+              setIsLogin(true);
+              setError("");
+            }}
+            className="w-full py-2 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 text-indigo-400 text-xs font-bold transition-all cursor-pointer"
+          >
+            Login as <span className="font-mono bg-indigo-500/15 px-1.5 py-0.5 rounded text-indigo-300">dummy</span> / <span className="font-mono bg-indigo-500/15 px-1.5 py-0.5 rounded text-indigo-300">dummy</span>
           </button>
         </div>
 

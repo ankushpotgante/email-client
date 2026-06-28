@@ -6,6 +6,7 @@ import email
 import json
 import logging
 import re
+import threading
 from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import List, Optional
 from email.header import decode_header
@@ -94,8 +95,8 @@ def create_account(account: Account, user_id: str = Depends(get_current_user)):
         welcome_id = f"welcome-{account.id}"
         iso_date = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         
-        welcome_email_body = f"Hi {account.name},\n\nWelcome to your new {account.type.upper()} email inbox on AuraMail!\n\nThis client integrates OpenAI agents to summarize threads, suggest quick replies, and prioritize incoming messages. We are thrilled to have you here.\n\nBest regards,\nThe AuraMail Team"
-        welcome_email_html = f"<p>Hi {account.name},</p><p>Welcome to your new {account.type.upper()} email inbox on AuraMail!</p><p>This client integrates OpenAI agents to summarize threads, suggest quick replies, and prioritize incoming messages. We are thrilled to have you here.</p><p>Best regards,<br>The AuraMail Team</p>"
+        welcome_email_body = f"Hi {account.name},\n\nWelcome to your new {account.type.upper()} email inbox on AuraMail!\n\nThis client integrates AI agents to summarize threads, suggest quick replies, and prioritize incoming messages. We are thrilled to have you here.\n\nBest regards,\nThe AuraMail Team"
+        welcome_email_html = f"<p>Hi {account.name},</p><p>Welcome to your new {account.type.upper()} email inbox on AuraMail!</p><p>This client integrates AI agents to summarize threads, suggest quick replies, and prioritize incoming messages. We are thrilled to have you here.</p><p>Best regards,<br>The AuraMail Team</p>"
         
         db.add_email(
             email_id=welcome_id,
@@ -123,9 +124,11 @@ def get_emails(
     account: Optional[str] = Query(None, description="Account ID or 'all'"),
     folder: Optional[str] = Query(None, description="Folder name (inbox, archived, trash, sent)"),
     q: Optional[str] = Query(None, description="Search query string"),
+    limit: int = Query(25, description="Number of emails to return"),
+    offset: int = Query(0, description="Pagination offset"),
     user_id: str = Depends(get_current_user)
 ):
-    rows = db.get_emails(user_id=user_id, account_id=account, folder=folder, q=q)
+    rows = db.get_emails(user_id=user_id, account_id=account, folder=folder, q=q, limit=limit, offset=offset)
     return [Email(
         id=r["id"],
         accountId=r["account_id"],
@@ -280,6 +283,98 @@ def compose_email(email_data: dict, user_id: str = Depends(get_current_user)):
         }
     }
 
+@router.post("/forward")
+def forward_email(email_data: dict, user_id: str = Depends(get_current_user)):
+    original_id = email_data.get("emailId")
+    to_email = email_data.get("toEmail")
+    note = email_data.get("note", "")
+    
+    if not original_id or not to_email:
+        raise HTTPException(status_code=400, detail="emailId and toEmail are required")
+    
+    original = db.get_email_by_id(user_id, original_id)
+    if not original:
+        raise HTTPException(status_code=404, detail="Original email not found")
+    
+    # Find sender account
+    from_account = db.get_account_by_id(user_id, original.get("account_id"))
+    if not from_account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    
+    from_email = from_account["email"]
+    from_name = from_account["name"]
+    password_encrypted = from_account["password_encrypted"]
+    
+    orig_subject = original.get("subject", "")
+    fwd_subject = orig_subject if orig_subject.startswith("Fwd:") else f"Fwd: {orig_subject}"
+    
+    orig_body = original.get("body", "")
+    fwd_body = f"{note}\n\n--- Forwarded Message ---\nFrom: {original.get('from_name')} <{original.get('from_email')}>\nDate: {original.get('date')}\nSubject: {orig_subject}\n\n{orig_body}"
+    
+    orig_html = original.get("body_html", "") or orig_body.replace("\n", "<br>")
+    note_html = note.replace("\n", "<br>") if note else ""
+    fwd_body_html = f"<p>{note_html}</p><hr style='border:1px solid #3f3f46;margin:16px 0;'><p style='color:#71717a;font-size:12px;'>--- Forwarded Message ---<br>From: {original.get('from_name')} &lt;{original.get('from_email')}&gt;<br>Subject: {orig_subject}</p>{orig_html}"
+    
+    email_id = f"fwd-{str(uuid.uuid4())[:8]}"
+    iso_date = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    
+    # Send via SMTP if real account
+    if password_encrypted:
+        plain_password = decrypt_password(password_encrypted)
+        smtp_server = "smtp.gmail.com"
+        smtp_port = 587
+        if from_account["type"] == "office365":
+            smtp_server = "smtp.office365.com"
+        elif from_account["type"] == "imap" and "@" in from_email:
+            domain = from_email.split("@")[1]
+            if "yahoo" in domain:
+                smtp_server = "smtp.mail.yahoo.com"
+            elif "icloud" in domain:
+                smtp_server = "smtp.mail.me.com"
+        try:
+            msg = MIMEMultipart()
+            msg['From'] = f"{from_name} <{from_email}>"
+            msg['To'] = to_email
+            msg['Subject'] = fwd_subject
+            msg.attach(MIMEText(fwd_body, 'plain', 'utf-8'))
+            server = smtplib.SMTP(smtp_server, smtp_port, timeout=10)
+            server.starttls()
+            server.login(from_email, plain_password)
+            server.sendmail(from_email, to_email, msg.as_string())
+            server.quit()
+            logger.info(f"SMTP: Forwarded email from {from_email} to {to_email}.")
+        except Exception as e:
+            logger.error(f"SMTP forward failed: {e}")
+            raise HTTPException(status_code=400, detail=f"Failed to forward email. Error: {str(e)}")
+    
+    db.add_email(
+        email_id=email_id,
+        account_id=original.get("account_id"),
+        user_id=user_id,
+        from_email=from_email,
+        from_name=from_name,
+        to_email=to_email,
+        subject=fwd_subject,
+        body=fwd_body,
+        body_html=fwd_body_html,
+        date_str=iso_date,
+        folder="sent",
+        labels=["Forwarded"],
+        read=True,
+        priority="medium"
+    )
+    
+    return {
+        "success": True,
+        "email": {
+            "id": email_id,
+            "subject": fwd_subject,
+            "toEmail": to_email,
+            "date": iso_date,
+            "folder": "sent"
+        }
+    }
+
 @router.post("/{account_id}/sync")
 def sync_emails(account_id: str, user_id: str = Depends(get_current_user)):
     # Find account
@@ -345,9 +440,9 @@ def sync_emails(account_id: str, user_id: str = Depends(get_current_user)):
             raise HTTPException(status_code=400, detail="Failed to search IMAP inbox")
             
         msg_ids = messages[0].split()
-        # Sync the last 5 emails to make it responsive
-        recent_ids = msg_ids[-5:]
+        recent_ids = msg_ids[-25:]
         synced_count = 0
+        newly_synced_ids = []  # collect IDs of freshly inserted emails for background triage
         
         for msg_id in reversed(recent_ids):
             status, data = imap.fetch(msg_id, "(RFC822)")
@@ -382,20 +477,6 @@ def sync_emails(account_id: str, user_id: str = Depends(get_current_user)):
                 
             iso_date = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             
-            # Sync triage
-            priority = "medium"
-            priority_reason = ""
-            try:
-                from api.agents.agent_os import triage_agent
-                email_text = f"From: {from_name} <{from_email}>\nSubject: {subject}\nBody: {body}"
-                triage_json = triage_agent.run(email_text, json_mode=True)
-                triage_result = json.loads(triage_json)
-                priority = triage_result.get("priority", "medium")
-                priority_reason = triage_result.get("reason", "")
-            except Exception as e:
-                logger.error(f"Triage failed for synced email: {e}")
-                priority_reason = "Triage skipped due to processing error."
-                
             db.add_email(
                 email_id=local_id,
                 account_id=account_id,
@@ -410,14 +491,109 @@ def sync_emails(account_id: str, user_id: str = Depends(get_current_user)):
                 folder="inbox",
                 labels=["Inbox"],
                 read=False,
-                priority=priority,
-                priority_reason=priority_reason,
+                priority="medium",
+                priority_reason="",
                 summary=""
             )
+            newly_synced_ids.append(local_id)
             synced_count += 1
             
-        imap.close()
+        # Also sync Sent folder — track selected state carefully
+        imap_in_selected_state = True  # INBOX is currently selected
+        sent_folder_names = ["[Gmail]/Sent Mail", "Sent Items", "Sent Messages", "Sent"]
+        sent_synced = False
+        for sent_folder in sent_folder_names:
+            try:
+                # Quote folder names that contain spaces
+                folder_arg = f'"{sent_folder}"' if ' ' in sent_folder else sent_folder
+                status2, _ = imap.select(folder_arg)
+                if status2 == "OK":
+                    imap_in_selected_state = True
+                    status3, sent_msgs = imap.search(None, "ALL")
+                    if status3 == "OK" and sent_msgs[0]:
+                        sent_ids = sent_msgs[0].split()
+                        recent_sent = sent_ids[-10:]
+                        for smsg_id in reversed(recent_sent):
+                            sstatus, sdata = imap.fetch(smsg_id, "(RFC822)")
+                            if sstatus != "OK" or not sdata:
+                                continue
+                            sraw = sdata[0][1]
+                            smsg = email.message_from_bytes(sraw)
+                            slid = f"imap-sent-{account_id}-{smsg_id.decode('utf-8')}"
+                            if db.get_email_by_id(user_id, slid):
+                                continue
+                            ssubject = decode_mime_header(smsg.get("Subject", "(No Subject)"))
+                            sto_header = smsg.get("To", "")
+                            sto_name, sto_email_addr = email.utils.parseaddr(sto_header)
+                            sfrom_header = smsg.get("From", "")
+                            sfrom_name, sfrom_email_addr = email.utils.parseaddr(sfrom_header)
+                            sbody, sbody_html = get_email_body_content(smsg)
+                            if not sbody:
+                                sbody = "(No readable content)"
+                            if not sbody_html:
+                                sbody_html = sbody.replace("\n", "<br>")
+                            db.add_email(
+                                email_id=slid,
+                                account_id=account_id,
+                                user_id=user_id,
+                                from_email=sfrom_email_addr or account["email"],
+                                from_name=sfrom_name or account["name"],
+                                to_email=sto_email_addr or "",
+                                subject=ssubject,
+                                body=sbody,
+                                body_html=sbody_html,
+                                date_str=iso_date,
+                                folder="sent",
+                                labels=["Sent"],
+                                read=True,
+                                priority="low"
+                            )
+                            synced_count += 1
+                    sent_synced = True
+                    break  # Found and processed Sent folder, stop looking
+                else:
+                    imap_in_selected_state = False  # select failed, not in SELECTED state
+            except Exception as se:
+                logger.warning(f"Could not sync sent folder '{sent_folder}': {se}")
+                imap_in_selected_state = False
+                continue
+
+        # Only call close() when actually in SELECTED state
+        try:
+            if imap_in_selected_state:
+                imap.close()
+        except Exception:
+            pass
         imap.logout()
+
+        # Run AI triage in background for newly synced inbox emails (non-blocking)
+
+        def run_background_triage(uid: str, email_ids: list):
+            from api.agents.agent_os import triage_agent
+            for eid in email_ids:
+                try:
+                    e = db.get_email_by_id(uid, eid)
+                    if not e or e.get("priority_reason"):
+                        continue
+                    email_text = f"From: {e.get('from_name')} <{e.get('from_email')}>\nSubject: {e.get('subject')}\nBody: {e.get('body', '')[:600]}"
+                    triage_json = triage_agent.run(email_text, json_mode=True)
+                    triage_result = json.loads(triage_json)
+                    db.update_email_triage(
+                        uid, eid,
+                        triage_result.get("priority", "medium"),
+                        triage_result.get("reason", "")
+                    )
+                except Exception as ex:
+                    logger.warning(f"Background triage failed for {eid}: {ex}")
+
+        if newly_synced_ids:
+            t = threading.Thread(
+                target=run_background_triage,
+                args=(user_id, newly_synced_ids),
+                daemon=True
+            )
+            t.start()
+
         return {"status": "success", "synced": synced_count}
         
     except imaplib.IMAP4.error as e:

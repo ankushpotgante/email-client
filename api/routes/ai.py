@@ -78,3 +78,45 @@ def draft_reply(request: DraftRequest, user_id: str = Depends(get_current_user))
         return DraftResponse(body=draft_text)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI Drafting failed: {str(e)}")
+
+
+class SmartSuggestionsRequest(BaseModel):
+    emailId: str
+
+@router.post("/smart-suggestions")
+def get_smart_suggestions(request: SmartSuggestionsRequest, user_id: str = Depends(get_current_user)):
+    email = db.get_email_by_id(user_id, request.emailId)
+    if not email:
+        raise HTTPException(status_code=404, detail="Email not found")
+    
+    email_text = f"From: {email.get('from_name')} <{email.get('from_email')}>\nSubject: {email.get('subject')}\nBody: {email.get('body', '')[:500]}"
+    
+    system_prompt = """You are an email assistant. Based on the email content provided, generate exactly 3 short, contextually relevant quick-reply suggestions.
+
+Respond ONLY with a JSON array of 3 objects. Each object must have:
+- label: short button label (max 4 words)
+- prompt: brief instruction for drafting the reply (max 15 words)
+
+Example format:
+[{"label": "Confirm Meeting", "prompt": "Confirm the meeting and ask for agenda details."}, ...]"""
+    
+    try:
+        from api.ai.openai_service import call_openai
+        response = call_openai(
+            system_prompt=system_prompt,
+            user_prompt=f"Email to reply to:\n{email_text}",
+            json_mode=True
+        )
+        suggestions = json.loads(response)
+        if not isinstance(suggestions, list):
+            raise ValueError("Response is not a list")
+        return {"suggestions": suggestions[:3]}
+    except Exception as e:
+        # Fallback to generic suggestions if LLM fails
+        return {
+            "suggestions": [
+                {"label": "Acknowledge & Confirm", "prompt": "Acknowledge receipt and confirm action."},
+                {"label": "Request More Time", "prompt": "Politely request more time to review."},
+                {"label": "Schedule a Call", "prompt": "Suggest scheduling a quick call to discuss."}
+            ]
+        }

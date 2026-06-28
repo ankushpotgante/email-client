@@ -16,7 +16,9 @@ import {
   ChevronRight, 
   ArrowRight,
   AlertCircle,
-  Inbox
+  Inbox,
+  Forward,
+  X
 } from "lucide-react";
 import canvasConfetti from "canvas-confetti";
 
@@ -34,7 +36,8 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
     generateAIDraft,
     moveToFolder,
     toggleReadStatus,
-    setIsComposeOpen
+    setIsComposeOpen,
+    token
   } = useEmailStore();
 
   const [aiSummary, setAiSummary] = useState<string>("");
@@ -43,6 +46,12 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
   const [generatedDraft, setGeneratedDraft] = useState<string>("");
   const [isDrafting, setIsDrafting] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"read" | "summary" | "reply">("read");
+  const [isForwardOpen, setIsForwardOpen] = useState(false);
+  const [forwardTo, setForwardTo] = useState("");
+  const [forwardNote, setForwardNote] = useState("");
+  const [isForwarding, setIsForwarding] = useState(false);
+  const [smartSuggestions, setSmartSuggestions] = useState<Array<{label: string; prompt: string}> | null>(null);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
 
   // Find the currently selected email
   const email = emails.find((e) => e.id === activeEmailId);
@@ -53,6 +62,10 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
     setGeneratedDraft("");
     setCustomPrompt("");
     setActiveTab("read");
+    setIsForwardOpen(false);
+    setForwardTo("");
+    setForwardNote("");
+    setSmartSuggestions(null);
   }, [activeEmailId]);
 
   if (!email) {
@@ -74,7 +87,7 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
           <Mail className="w-12 h-12 text-zinc-805 mb-4 animate-bounce" />
           <h3 className="text-zinc-300 font-bold text-sm">Select a message</h3>
           <p className="text-xs text-zinc-500 mt-1 max-w-xs leading-relaxed">
-            Choose an email from your feed to view attachments, read conversations, or write OpenAI draft replies.
+            Choose an email from your feed to view attachments, read conversations, or draft AI-powered replies.
           </p>
         </div>
       </div>
@@ -90,7 +103,7 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
     }
   };
 
-  // Generate Reply Draft using OpenAI
+  // Generate Reply Draft using AI
   const handleGenerateDraft = async (promptOverride?: string) => {
     setIsDrafting(true);
     setActiveTab("reply");
@@ -105,16 +118,63 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
     }
   };
 
-  // Preset reply triggers
-  const replyPresets = [
-    { label: "Acknowledge & Confirm", prompt: "Acknowledge receipt and confirm we will review this soon." },
-    { label: "Politely Request Delay", prompt: "Request more time to review and schedule a meeting next week." },
-    { label: "Decline Invitation", prompt: "Politely decline the request, noting a busy schedule." }
-  ];
+  // Load dynamic AI-generated smart suggestions
+  const handleOpenReplyTab = async () => {
+    setActiveTab("reply");
+    if (!smartSuggestions && email) {
+      setIsLoadingSuggestions(true);
+      try {
+        const res = await fetch("/api/ai/smart-suggestions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ emailId: email.id })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSmartSuggestions(data.suggestions || []);
+        }
+      } catch (e) {
+        console.error("Failed to load suggestions:", e);
+      } finally {
+        setIsLoadingSuggestions(false);
+      }
+    }
+  };
+
+  // Forward email handler
+  const handleForward = async () => {
+    if (!forwardTo || !email) return;
+    setIsForwarding(true);
+    try {
+      const res = await fetch("/api/emails/forward", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          emailId: email.id,
+          toEmail: forwardTo,
+          note: forwardNote
+        })
+      });
+      if (res.ok) {
+        setIsForwardOpen(false);
+        setForwardTo("");
+        setForwardNote("");
+      }
+    } catch (e) {
+      console.error("Failed to forward email:", e);
+    } finally {
+      setIsForwarding(false);
+    }
+  };
 
   // Insert generated draft into main Compose window
   const handleInsertIntoComposer = () => {
-    // We will save the draft into window state or localStorage so the ComposeModal can fetch it!
     if (typeof window !== "undefined") {
       localStorage.setItem("auramail_draft_to", email.fromEmail);
       localStorage.setItem("auramail_draft_subject", `Re: ${email.subject}`);
@@ -173,6 +233,17 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
               </>
             )}
           </button>
+          <button
+            onClick={() => setIsForwardOpen(!isForwardOpen)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${
+              isForwardOpen
+                ? "bg-teal-500/10 border-teal-500/30 text-teal-400"
+                : "bg-zinc-900/40 border-zinc-800/80 text-zinc-400 hover:text-teal-400 hover:bg-zinc-900 hover:border-zinc-800"
+            }`}
+          >
+            <Forward className="w-3.5 h-3.5" />
+            <span>Forward</span>
+          </button>
         </div>
 
         {/* Tab switcher */}
@@ -199,12 +270,12 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
             <span>AI Summary</span>
           </button>
           <button
-            onClick={() => setActiveTab("reply")}
             className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
               activeTab === "reply"
                 ? "bg-zinc-800 text-zinc-100 shadow"
                 : "text-zinc-500 hover:text-zinc-300"
             }`}
+            onClick={handleOpenReplyTab}
           >
             Smart Reply
           </button>
@@ -249,13 +320,63 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
           <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/10 flex items-start gap-3 shadow shadow-amber-500/2">
             <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider">OpenAI Triage Insight</h4>
+              <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider">AI Triage Insight</h4>
               <p className="text-xs text-zinc-400 leading-relaxed mt-1">{email.priorityReason}</p>
             </div>
           </div>
         )}
 
-        {/* Active Content Tabs */}
+        {/* Forward Panel */}
+        {isForwardOpen && (
+          <div className="bg-teal-500/5 border border-teal-500/20 rounded-2xl p-4 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Forward className="w-4 h-4 text-teal-400" />
+                <h4 className="text-xs font-bold text-teal-400">Forward Email</h4>
+              </div>
+              <button onClick={() => setIsForwardOpen(false)} className="text-zinc-500 hover:text-zinc-300 cursor-pointer">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              <input
+                type="email"
+                value={forwardTo}
+                onChange={(e) => setForwardTo(e.target.value)}
+                placeholder="Forward to email address..."
+                className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-teal-500/50"
+              />
+              <textarea
+                value={forwardNote}
+                onChange={(e) => setForwardNote(e.target.value)}
+                placeholder="Add a note (optional)..."
+                rows={2}
+                className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-teal-500/50 resize-none"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setIsForwardOpen(false)}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleForward}
+                disabled={!forwardTo || isForwarding}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-teal-500 hover:bg-teal-600 disabled:bg-zinc-800 disabled:text-zinc-600 text-white text-xs font-bold transition-colors cursor-pointer"
+              >
+                {isForwarding ? (
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Forward className="w-3.5 h-3.5" />
+                )}
+                <span>Forward</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {activeTab === "read" && (
           <div className="bg-zinc-900/20 border border-zinc-900/60 rounded-2xl p-6 shadow-sm overflow-x-hidden w-full">
             {email.bodyHtml ? (
@@ -266,65 +387,81 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
                   <html>
                     <head>
                       <meta charset="utf-8">
+                      <meta name="viewport" content="width=device-width, initial-scale=1">
                       <style>
-                        body {
-                          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                          font-size: 13.5px;
-                          line-height: 1.6;
-                          color: #d4d4d8; /* zinc-300 */
+                        * { box-sizing: border-box; }
+                        html, body {
                           margin: 0;
                           padding: 0;
+                          width: 100%;
+                        }
+                        body {
+                          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                          font-size: 14px;
+                          line-height: 1.65;
+                          color: #d4d4d8;
                           word-wrap: break-word;
                           overflow-wrap: break-word;
                           background-color: transparent;
+                          padding: 4px 2px;
                         }
                         a { color: #818cf8; text-decoration: none; font-weight: 500; }
                         a:hover { text-decoration: underline; }
-                        img { max-w: 100%; height: auto; border-radius: 8px; margin: 8px 0; }
+                        img { max-width: 100% !important; height: auto; border-radius: 8px; margin: 8px 0; display: block; }
                         p { margin: 0 0 1em 0; }
                         p:last-child { margin-bottom: 0; }
                         blockquote {
-                          border-left: 3px solid #3f3f46; /* zinc-700 */
+                          border-left: 3px solid #3f3f46;
                           margin: 1em 0;
                           padding-left: 1em;
-                          color: #a1a1aa; /* zinc-400 */
+                          color: #a1a1aa;
                         }
                         ul, ol { margin: 0 0 1em 0; padding-left: 1.5em; }
-                        pre {
-                          background-color: #18181b; /* zinc-900 */
+                        table { max-width: 100% !important; width: 100% !important; border-collapse: collapse; }
+                        td, th { padding: 6px; }
+                        pre, code {
+                          background-color: #18181b;
                           border: 1px solid #27272a;
-                          padding: 12px;
-                          border-radius: 8px;
-                          overflow-x: auto;
+                          border-radius: 6px;
                           font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
                           font-size: 12px;
                         }
+                        pre { padding: 12px; overflow-x: auto; }
+                        code { padding: 2px 4px; }
+                        h1,h2,h3,h4 { color: #f4f4f5; margin: 0 0 0.75em 0; }
+                        hr { border: 0; border-top: 1px solid #3f3f46; margin: 1.5em 0; }
+                        div[style] { max-width: 100% !important; }
                       </style>
                     </head>
-                    <body>
-                      ${email.bodyHtml}
-                    </body>
+                    <body>${email.bodyHtml}</body>
                   </html>
                 `}
                 sandbox="allow-popups allow-popups-to-escape-sandbox"
-                className="w-full border-0 bg-transparent block"
-                style={{
-                  height: "250px", // Initial fallback
-                  colorScheme: "dark"
-                }}
+                className="w-full border-0 bg-transparent block min-h-[420px]"
+                style={{ colorScheme: "dark" }}
                 onLoad={(e) => {
                   try {
                     const iframe = e.currentTarget;
-                    if (iframe.contentWindow) {
-                      setTimeout(() => {
-                        const body = iframe.contentDocument?.body;
-                        if (body) {
-                          iframe.style.height = `${body.scrollHeight + 16}px`;
-                        }
-                      }, 150);
-                    }
+                    const resize = () => {
+                      const body = iframe.contentDocument?.body;
+                      const html = iframe.contentDocument?.documentElement;
+                      if (body && html) {
+                        const height = Math.max(
+                          body.scrollHeight,
+                          body.offsetHeight,
+                          html.clientHeight,
+                          html.scrollHeight,
+                          html.offsetHeight
+                        );
+                        iframe.style.height = `${height + 24}px`;
+                      }
+                    };
+                    resize();
+                    // Try again after images load
+                    setTimeout(resize, 400);
+                    setTimeout(resize, 1000);
                   } catch (err) {
-                    console.error("Iframe load resize error:", err);
+                    console.error("Iframe resize error:", err);
                   }
                 }}
               />
@@ -381,7 +518,16 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
 
               {/* Action Presets */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {replyPresets.map((preset) => (
+                {isLoadingSuggestions ? (
+                  // Skeleton loading state
+                  [1,2,3].map((i) => (
+                    <div key={i} className="py-2.5 px-3 rounded-xl bg-zinc-900 border border-zinc-800/80 animate-pulse h-9" />
+                  ))
+                ) : (smartSuggestions || [
+                  { label: "Acknowledge & Confirm", prompt: "Acknowledge receipt and confirm we will review this soon." },
+                  { label: "Request More Time", prompt: "Request more time to review and schedule a meeting next week." },
+                  { label: "Decline Politely", prompt: "Politely decline the request, noting a busy schedule." }
+                ]).map((preset) => (
                   <button
                     key={preset.label}
                     onClick={() => handleGenerateDraft(preset.prompt)}
@@ -399,7 +545,7 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
                   type="text"
                   value={customPrompt}
                   onChange={(e) => setCustomPrompt(e.target.value)}
-                  placeholder="Tell OpenAI what you want to write..."
+                  placeholder="Tell AI what you want to write..."
                   className="flex-1 px-4 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500/50"
                 />
                 <button
@@ -418,7 +564,7 @@ export default function EmailDetail({ isEmailListCollapsed, onToggleEmailList }:
                 <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
                   <span className="text-xs font-bold text-indigo-400 flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span>OpenAI Draft Output</span>
+                    <span>AI Draft Output</span>
                   </span>
                   
                   {generatedDraft && !isDrafting && (
