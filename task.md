@@ -23,11 +23,11 @@
   - `[x]` Implement React Context store in `src/lib/store/store.ts` (created as store.tsx)
   - `[x]` Create `public/manifest.json` and `public/sw.js` PWA definitions
   - `[x]` Build layout wrappers and `Sidebar` switcher
-- `[ ]` **Phase 5: Interactive UI Components (Tailwind v4)**
-  - `[ ]` Build unified list `EmailList.tsx` with scroll & swipe styles
-  - `[ ]` Build detail pane `EmailDetail.tsx` with summary cards & smart reply hooks
-  - `[ ]` Build compose modal `ComposeModal.tsx`
-  - `[ ]` UI Polish & transitions (Outfit font, animations, inbox zero confetti)
+- `[x]` **Phase 5: Interactive UI Components (Tailwind v4)**
+  - `[x]` Build unified list `EmailList.tsx` with scroll & swipe styles
+  - `[x]` Build detail pane `EmailDetail.tsx` with summary cards & smart reply hooks
+  - `[x]` Build compose modal `ComposeModal.tsx`
+  - `[x]` UI Polish & transitions (Outfit font, animations, inbox zero confetti)
 - `[ ]` **Phase 6: Testing, Polish & Documentation**
   - `[ ]` Write backend unit tests in `api/tests/` and verify with Pytest
   - `[ ]` Write frontend tests for stores & page actions
