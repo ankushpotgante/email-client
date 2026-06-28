@@ -2,9 +2,9 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy dependency configs and run clean install
+# Copy dependency configs and run install
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm install
 
 # Copy frontend source code and configs
 COPY src/ ./src/
