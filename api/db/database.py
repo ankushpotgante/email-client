@@ -8,9 +8,12 @@ from typing import List, Optional, Dict, Any
 # Setup logger
 logger = logging.getLogger("Database")
 
-# Resolve DB path at the root of the project
+# Resolve DB path at the root of the project (use writable /tmp for Vercel)
 ROOT_PATH = Path(__file__).resolve().parent.parent.parent
-DB_PATH = ROOT_PATH / "auramail.db"
+if os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"):
+    DB_PATH = Path("/tmp/auramail.db")
+else:
+    DB_PATH = ROOT_PATH / "auramail.db"
 
 class Database:
     def __init__(self, db_path: Path = DB_PATH):
