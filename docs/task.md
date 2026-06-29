@@ -46,3 +46,20 @@
   - `[x]` Update React store Context in `store.tsx` to handle authentication states and headers
   - `[x]` Implement secure sandbox iframe email HTML body rendering in `EmailDetail.tsx`
   - `[x]` Write backend auth test specs in `api/tests/test_backend.py` and run verification tests
+- `[x]` **Phase 8: Active Tab Delta Polling**
+  - `[x]` Implement delta polling in IMAP sync endpoint (`emails.py`) by breaking on duplicates
+  - `[x]` Implement client-side active tab visibility-aware polling in React (`page.tsx`)
+  - `[x]` Enable permanent manual sync button that updates all accounts in Unified view
+- `[x]` **Phase 9: Gmail-Inspired Body Rendering & Switcher**
+  - `[x]` Unify plain text and HTML emails to render inside the same paper-white background card
+  - `[x]` Add an HTML/Text toggle button group for messages with both representations
+  - `[x]` Ensure plain text messages use clean, readable line-heights and copyable spacing
+- `[x]` **Phase 10: Custom IMAP Host & Port Configurations**
+  - `[x]` Add dynamic IMAP Host and Port fields in AddAccountModal.tsx
+  - `[x]` Update store.tsx addAccount and fetchAccounts for custom host payload
+  - `[x]` Update models.py and database.py with table migrations (imap_host / imap_port)
+  - `[x]` Refactor emails.py connection endpoints to utilize custom IMAP settings
+- `[x]` **Phase 11: Local SSL Bypass & Render Loop Stability**
+  - `[x]` Bypass local system Python SSL handshake verification blocks
+  - `[x]` Wrap syncEmails in useCallback hook inside store.tsx to prevent infinite render loops
+  - `[x]` Sanity check production Next.js compiler and python pytest runs

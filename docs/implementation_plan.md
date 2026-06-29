@@ -56,54 +56,73 @@ We will execute the project in six distinct phases to ensure thorough developmen
 *   **Step 5.3**: Build `ComposeModal.tsx` containing draft inputs. Integrate it with the DraftingAgent so users can generate responses via prompt or preset tones.
 *   **Step 5.4**: Polish visual appearance: add smooth hover animations, custom fonts (Outfit & Inter), scrollbars, and celebrate inbox-zero with canvas-confetti.
 
-### Phase 6: Testing, Polish & Documentation
-*   **Step 6.1**: Write Python automated tests (`api/tests/`) for routing and agent triage logic. Run tests with `pytest`.
-*   **Step 6.2**: Write Vitest unit/integration tests for React states, folder changes, and UI component actions.
-*   **Step 6.3**: Create documentation files:
-    *   `GEMINI.md`: Development playbook, CLI commands, scripts.
-    *   `architecture.md`: One-page architectural breakdown.
-    *   `agents_workflow.md`: Narrative of Agent OS structures, skills, and hooks.
-*   **Step 6.4**: Verify local installation, build optimization, and prepare for Vercel deployment.
+### Phase 7: Persistent User Management & HTML Email Rendering
+*   **Step 7.1**: Integrate PyJWT and bcrypt to hash user passwords and sign secure bearer authorization tokens.
+*   **Step 7.2**: Create the SQLite database layer at [api/db/database.py](file:///d:/Ank/atg/email-client/api/db/database.py) with automated migration checks.
+*   **Step 7.3**: Create user auth router at [api/routes/auth.py](file:///d:/Ank/atg/email-client/api/routes/auth.py) and secure all endpoints.
+*   **Step 7.4**: Implement a sandboxed secure `iframe` inside `EmailDetail.tsx` to safely render rich HTML emails.
+
+### Phase 8: Active Tab Delta Polling
+*   **Step 8.1**: Optimize the IMAP synchronization loop to terminate search traversals immediately when duplicate email records are detected in the database.
+*   **Step 8.2**: Implement a visibility-aware React sync hook inside `page.tsx` that triggers delta polls every 2 minutes only if the browser tab is focused.
+*   **Step 8.3**: Enable manual sync button operations across all folder views and accounts.
+
+### Phase 9: Gmail-Inspired Body Rendering & Switchers
+*   **Step 9.1**: Unify both plain text and rich HTML email renders inside a clean paper-white card.
+*   **Step 9.2**: Add format switchers (`[ HTML ]` / `[ Text ]`) for message bodies containing both representations.
+
+### Phase 10: Custom IMAP Host & Port Configurations
+*   **Step 10.1**: Add IMAP Host and Port setting input text fields inside the connection modal.
+*   **Step 10.2**: Update the backend account routers and schemas to accept, save, and utilize custom IMAP configurations.
+
+### Phase 11: Local SSL Bypass & Render Loop Stability
+*   **Step 11.1**: Bypass local system Python SSL handshake verification blocks to prevent certificate errors.
+*   **Step 11.2**: Memoize key email state synchronization functions inside `store.tsx` to eliminate infinite rendering loops.
 
 ---
 
 ## Proposed Changes
 
-Below are files to be created or modified inside `d:\Ank\atg\email-client`.
+Below are files created or modified inside `d:\Ank\atg\email-client`.
 
 ### Backend Components
 
 #### [NEW] [requirements.txt](file:///d:/Ank/atg/email-client/requirements.txt)
 #### [NEW] [api/index.py](file:///d:/Ank/atg/email-client/api/index.py)
 #### [NEW] [api/models.py](file:///d:/Ank/atg/email-client/api/models.py)
-#### [NEW] [api/db/mock_data.py](file:///d:/Ank/atg/email-client/api/db/mock_data.py)
+#### [NEW] [api/auth.py](file:///d:/Ank/atg/email-client/api/auth.py)
+#### [NEW] [api/db/database.py](file:///d:/Ank/atg/email-client/api/db/database.py)
+#### [NEW] [api/routes/auth.py](file:///d:/Ank/atg/email-client/api/routes/auth.py)
 #### [NEW] [api/routes/emails.py](file:///d:/Ank/atg/email-client/api/routes/emails.py)
 #### [NEW] [api/routes/ai.py](file:///d:/Ank/atg/email-client/api/routes/ai.py)
-#### [NEW] [api/ai/gemini.py](file:///d:/Ank/atg/email-client/api/ai/gemini.py)
+#### [NEW] [api/ai/openai_service.py](file:///d:/Ank/atg/email-client/api/ai/openai_service.py)
 #### [NEW] [api/agents/agent_os.py](file:///d:/Ank/atg/email-client/api/agents/agent_os.py)
-#### [NEW] [api/tests/test_agents.py](file:///d:/Ank/atg/email-client/api/tests/test_agents.py)
+#### [NEW] [api/tests/test_backend.py](file:///d:/Ank/atg/email-client/api/tests/test_backend.py)
 
 ### Frontend Components
 
 #### [NEW] [package.json](file:///d:/Ank/atg/email-client/package.json)
-#### [NEW] [next.config.mjs](file:///d:/Ank/atg/email-client/next.config.mjs)
-#### [NEW] [postcss.config.mjs](file:///d:/Ank/atg/email-client/postcss.config.mjs)
+#### [NEW] [next.config.ts](file:///d:/Ank/atg/email-client/next.config.ts)
 #### [NEW] [src/app/globals.css](file:///d:/Ank/atg/email-client/src/app/globals.css)
 #### [NEW] [src/app/layout.tsx](file:///d:/Ank/atg/email-client/src/app/layout.tsx)
 #### [NEW] [src/app/page.tsx](file:///d:/Ank/atg/email-client/src/app/page.tsx)
-#### [NEW] [src/lib/store/store.ts](file:///d:/Ank/atg/email-client/src/lib/store/store.ts)
+#### [NEW] [src/lib/store/store.tsx](file:///d:/Ank/atg/email-client/src/lib/store/store.tsx)
+#### [NEW] [src/components/AuthScreen.tsx](file:///d:/Ank/atg/email-client/src/components/AuthScreen.tsx)
 #### [NEW] [src/components/Sidebar.tsx](file:///d:/Ank/atg/email-client/src/components/Sidebar.tsx)
 #### [NEW] [src/components/EmailList.tsx](file:///d:/Ank/atg/email-client/src/components/EmailList.tsx)
 #### [NEW] [src/components/EmailDetail.tsx](file:///d:/Ank/atg/email-client/src/components/EmailDetail.tsx)
 #### [NEW] [src/components/ComposeModal.tsx](file:///d:/Ank/atg/email-client/src/components/ComposeModal.tsx)
+#### [NEW] [src/components/AddAccountModal.tsx](file:///d:/Ank/atg/email-client/src/components/AddAccountModal.tsx)
 #### [NEW] [public/manifest.json](file:///d:/Ank/atg/email-client/public/manifest.json)
 #### [NEW] [public/sw.js](file:///d:/Ank/atg/email-client/public/sw.js)
 
 ### Project Documentation
 
-#### [NEW] [GEMINI.md](file:///d:/Ank/atg/email-client/GEMINI.md)
-#### [NEW] [architecture.md](file:///d:/Ank/atg/email-client/architecture.md)
-#### [NEW] [agents_workflow.md](file:///d:/Ank/atg/email-client/agents_workflow.md)
+#### [NEW] [GEMINI.md](file:///d:/Ank/atg/email-client/docs/GEMINI.md)
+#### [NEW] [architecture.md](file:///d:/Ank/atg/email-client/docs/architecture.md)
+#### [NEW] [agents_workflow.md](file:///d:/Ank/atg/email-client/docs/agents_workflow.md)
+#### [NEW] [walkthrough.md](file:///d:/Ank/atg/email-client/docs/walkthrough.md)
+#### [NEW] [task.md](file:///d:/Ank/atg/email-client/docs/task.md)
 
 ---
 
