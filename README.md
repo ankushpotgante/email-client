@@ -13,7 +13,7 @@ You can run AuraMail in three different ways: using the **Concurrent Dev Server*
    ```bash
    cp .env.example .env
    ```
-2. Open `.env` and fill in your values (e.g., your `OPENAI_API_KEY` for AI features).
+2. Open `.env` and fill in your values (e.g., your `OPENAI_API_KEY` for AI features, `JWT_SECRET`, and optional encryption configurations).
 
 ### 💾 Database Setup & Seeding (Automatic)
 The SQLite database (`auramail.db`) is **automatically created and seeded** when you start the FastAPI backend. 
@@ -119,3 +119,29 @@ To ensure optimal performance and resource efficiency when deployed in serverles
 1. **Client-Side Visibility Gate**: The React application runs a periodic background check every **2 minutes**. It leverages the browser's Page Visibility API (`document.visibilityState === 'visible'`). If the user switches tabs or minimizes the window, the synchronization stops immediately, saving database and server resources.
 2. **Server-Side Early Break**: In the IMAP synchronization loop, emails are fetched from newest to oldest. As soon as the backend detects an email that already exists in the database, it instantly stops processing (`break`). This ensures subsequent checks take milliseconds instead of seconds, running minimal network and SQLite overhead.
 
+---
+
+## 🔒 Security & Cryptography
+
+*   **User Authentication**: Passwords are securely hashed using `bcrypt` during registration. Session paths are guarded using JWT Bearer authentication tokens.
+*   **Credential Protection**: Third-party email passwords and App Passwords are encrypted using AES-256 symmetric ciphers (`cryptography.fernet`) before being saved in SQLite.
+*   **Sandbox Security**: Incoming email bodies are parsed and loaded inside a secure sandboxed `iframe` in the React frontend, isolating layouts and blocking cross-site script execution (XSS).
+*   **Local SSL Handshake**: Outgoing server requests configure an SSL context bypass to enable local development environments to query IMAP services (port 993) regardless of local machine certificate store version issues.
+
+---
+
+## 🌐 Custom IMAP Domains & PWA
+
+*   **Custom Hosting**: Supports custom hosted domains (e.g., `user@company.com`) by letting you define your explicit **IMAP Host** and **Port** inside the Add Account modal.
+*   **PWA Offline Capabilities**: Configured with a Service Worker (`sw.js`) and PWA web app manifest (`manifest.json`) enabling offline launch and layout shell caching.
+
+---
+
+## 📖 Developer Documentation & Playbooks
+
+For deeper architectural analysis and command instructions, check the files inside the [docs](docs/) folder:
+*   [walkthrough.md](docs/walkthrough.md): Comprehensive phase-by-phase feature development narratives.
+*   [architecture.md](docs/architecture.md): Visual diagrams and layout flow of components.
+*   [agents_workflow.md](docs/agents_workflow.md): AI Agent OS specifications, skills registries, and hook details.
+*   [GEMINI.md](docs/GEMINI.md): Playbook for CLI shortcuts, testing setups, and Tailwind v4 theme guidelines.
+*   [task.md](docs/task.md): Project checklist and completed task lists.
