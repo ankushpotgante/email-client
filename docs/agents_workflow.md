@@ -1,25 +1,28 @@
 # AuraMail Multi-Agent AI Workflow
 
-This document describes the Agent OS implementation in AuraMail, detailing the agents, skills, hooks, and collaborative execution flows.
-
-## Agent OS Catalog
-
-### 1. Agents List
-- **`TriageAgent`**: Inbox analyzer. Inspects incoming email sender headers, subject line, and body to classify the message as `high`, `medium`, or `low` priority and drafts a short reasoning.
-- **`SummaryAgent`**: Core reader. Distills long, complex email text and threads into 2-3 action-oriented bullet points.
-- **`DraftingAgent`**: Reply co-author. Takes original email contexts, user directives, and requested tones (professional, friendly, casual, urgent) to write response templates.
-
-### 2. Skills Registry
-- **`call_openai`**: Integrates the OpenAI Python SDK to query **GPT-4o-mini** models. Manages system instructions, json configurations, and implements simulated local fallbacks.
-
-### 3. Hooks & Event Bindings
-- **`on_email_received`**: Activates automatically whenever a new email record is synchronized. Fires the `TriageAgent` to classify priority before the user even opens the inbox.
+This document describes the Agent OS implementation in AuraMail, detailing the agents, skills, hooks, collaborative workflows, and production-level strategies for cost control, rate limiting, and fallback handling.
 
 ---
 
-## AI-First Collaborative Workflows
+## 1. Agent OS Catalog
 
-AuraMail functions as a cooperative Agent OS where multiple agents work in sequence to triage, synthesize, and compose responses.
+### Specialized Agents
+
+-   **`TriageAgent`**: Inbox analyzer. Inspects incoming email sender headers, subject line, and body to classify the message as `high`, `medium`, or `low` priority and drafts a short reasoning.
+-   **`SummaryAgent`**: Core reader. Distills long, complex email text and threads into 2-3 action-oriented bullet points.
+-   **`DraftingAgent`**: Reply co-author. Takes original email contexts, user directives, and requested tones (professional, friendly, casual, urgent) to write response templates.
+
+### Skills Registry
+
+-   **`call_openai`**: Integrates the OpenAI Python SDK to query **GPT-4o-mini** models. Manages system instructions, json configurations, and implements simulated local fallbacks.
+
+### Hooks & Event Bindings
+
+-   **`on_email_received`**: Activates automatically whenever a new email record is synchronized. Fires the `TriageAgent` to classify priority before the user even opens the inbox.
+
+---
+
+## 2. Multi-Agent Operational Flow
 
 ```
        [New Email Received]
@@ -41,11 +44,27 @@ AuraMail functions as a cooperative Agent OS where multiple agents work in seque
                  └─► Composes context-aware response
 ```
 
-### Step 1: Automated Triaging & Triage Explanations
-When an email is received (or manually triaged), the `TriageAgent` is executed. Rather than a simple keyword filter, it utilizes OpenAI to understand the semantic context. For example, it distinguishes between a critical production warning (CPU > 95%) and a campus facility elevators schedule, assigning the proper tags and providing a 1-sentence logic statement (e.g. *"Q3 budget allocation at risk if roadmap slides are delayed"*).
+1.  **Triaging**: When a message is synchronized, the `TriageAgent` evaluates semantic urgency (e.g. distinguishing a critical server alert from a monthly digest) and writes importance metrics directly to the DB.
+2.  **Summarizing**: When a user selects an email, the `SummaryAgent` parses body sections to display action-oriented bullet-point panels on-demand.
+3.  **Drafting**: The `DraftingAgent` parses sender/receiver details, reviews user-provided prompts or selected tones, and writes response templates directly to the editor context.
 
-### Step 2: On-Demand Summarization
-When the user clicks the **"AI Summary"** tab on a message, the `SummaryAgent` takes over. It reads the raw contents and filters out unnecessary email boilerplate (like signatures, disclaimers, or generic sign-offs). It returns a clean bulleted breakdown of actionable next steps.
+---
 
-### Step 3: Context-Aware Reply Drafting
-If the user chooses to reply, they can select a preset instruction (e.g., *"Decline Invitation"*) or input custom details (e.g. *"tell David I will upload the link tonight"*). The `DraftingAgent` reads the original email body, extracts the names of sender and recipient, reviews the user's goals, and formats a complete response matching the requested tone (e.g., formal professional or warm friendly). The output is piped directly into the compose modal, enabling the user to send the response immediately.
+## 3. Senior Developer Review: Production AI Strategy
+
+Deploying LLM agents in a high-volume email client demands rigorous engineering constraints to prevent API cost explosions and rate-limiting blocks.
+
+### 💰 A. Cost Control & Token Optimization
+*   **Boilerplate Stripping**: Prior to sending the email body to OpenAI, the backend parser programmatically strips common sign-offs, disclaimers, and verbose HTML headers (e.g., repeating inline style wrappers). This reduces input token sizes by up to 60-80%.
+*   **Redis Cache Hashing**: Hashing the content of email threads. Before dispatching a request to `gpt-4o-mini`, the agent checks Redis for a matching hash to reuse cached triage scores or summaries, preventing redundant API charges on duplicate sync runs.
+
+### ⚡ B. Rate Limiting & Queue Backoff
+*   **Task Throttling**: In production, the `on_email_received` hook does not call the OpenAI API synchronously. Instead, tasks are placed in a queue managed by Celery.
+*   **Exponential Backoff**: If the API returns a `429 Too Many Requests` (exceeding RPM/TPM), Celery automatically schedules a retry using exponential backoff with jitter to smooth out traffic spikes.
+
+### 🛡️ C. Local Classifier Fallbacks
+*   **Rule-Based Pre-Filters**: Implement simple regex or keyword checks to automatically mark generic mailing lists or marketing addresses as `low` priority without calling the LLM.
+*   **Local Small Models**: Run a lightweight local text classification model (e.g., DistilBERT) on CPU worker nodes. This classifier filters out junk mail and newsletters, only delegating complex personal or business correspondence to the paid OpenAI API.
+
+### 👥 D. Human-in-the-Loop Validation
+*   **Safety Guard**: Drafts generated by the `DraftingAgent` are piped directly into the `ComposeModal` for editing. They are never sent automatically. The user reviews, edits, and explicitly clicks "Send", ensuring complete control and security.

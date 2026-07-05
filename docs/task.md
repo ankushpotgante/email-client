@@ -63,3 +63,11 @@
   - `[x]` Bypass local system Python SSL handshake verification blocks
   - `[x]` Wrap syncEmails in useCallback hook inside store.tsx to prevent infinite render loops
   - `[x]` Sanity check production Next.js compiler and python pytest runs
+- `[x]` **Phase 12: Production Readiness Audit & Architectural Review**
+  - `[x]` Audit SQLite concurrency issues and document PostgreSQL/RDS migration strategies
+  - `[x]` Design decoupled asynchronous IMAP sync queues using Celery and Redis task workers
+  - `[x]` Review secret rotation protocols and key generation vaults
+  - `[x]` Draft Python Bleach HTML sanitization middleware configurations to strip email tracking pixels
+  - `[x]` Integrate production monitoring (Sentry SDK, Prometheus metrics) checklists
+  - `[x]` Document AI agent rate-limiting queue backoffs and token prompt optimizations
+

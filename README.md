@@ -140,6 +140,7 @@ To ensure optimal performance and resource efficiency when deployed in serverles
 ## 📖 Developer Documentation & Playbooks
 
 For deeper architectural analysis and command instructions, check the files inside the [docs](docs/) folder:
+*   [production_readiness_audit.md](docs/production_readiness_audit.md): Production-readiness audit, database migrations, and scaling checklist.
 *   [walkthrough.md](docs/walkthrough.md): Comprehensive phase-by-phase feature development narratives.
 *   [architecture.md](docs/architecture.md): Visual diagrams and layout flow of components.
 *   [agents_workflow.md](docs/agents_workflow.md): AI Agent OS specifications, skills registries, and hook details.

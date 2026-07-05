@@ -53,11 +53,11 @@ npm run test
 
 ## Styling & Theme Rules
 - **Tailwind CSS v4**: All UI code is written using Tailwind CSS v4 utility classes.
-- **Theme Variables**: Configured inside [src/app/globals.css](file:///d:/Ank/atg/email-client/src/app/globals.css) using `@theme` syntax. Do not declare custom styles or components inside separate configuration files.
+- **Theme Variables**: Configured inside [src/app/globals.css](../src/app/globals.css) using `@theme` syntax. Do not declare custom styles or components inside separate configuration files.
 - **Glassmorphism**: Render custom blurred components using the `.glass-card` class defined globally.
 - **Typography**: The primary typography is **Outfit** for headers/branding, and **Inter** for readable paragraphs/email lists.
 
 ## Agent OS System
-- All agents (`TriageAgent`, `SummaryAgent`, `DraftingAgent`) inherit from the base `Agent` container in [api/agents/agent_os.py](file:///d:/Ank/atg/email-client/api/agents/agent_os.py).
+- All agents (`TriageAgent`, `SummaryAgent`, `DraftingAgent`) inherit from the base `Agent` container in [api/agents/agent_os.py](../api/agents/agent_os.py).
 - Bind all agent tool calls to the central `call_openai` skill.
-- Maintain fallback simulation models inside [api/ai/openai_service.py](file:///d:/Ank/atg/email-client/api/ai/openai_service.py) to guarantee the codebase builds and executes successfully even when an `OPENAI_API_KEY` is not loaded.
+- Maintain fallback simulation models inside [api/ai/openai_service.py](../api/ai/openai_service.py) to guarantee the codebase builds and executes successfully even when an `OPENAI_API_KEY` is not loaded.
